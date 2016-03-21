@@ -40,6 +40,8 @@ interface CoveritySpec {
     File getResultsFile()
     void setResultsFile(File results)
 
+    List<String> getArgs()
+
     ModelMap<CoverityStream> getStreams()
 }
 
@@ -108,6 +110,7 @@ class CoverityPlugin extends RuleSource {
             args '--auth-key-file', coverity.authKeyFile
             args '--text-output', coverity.resultsFile
             addHostConfig(task, coverity)
+            args(*coverity.args)
 
             binaries.each {
                 if (it in NativeBinarySpec) {
