@@ -15,6 +15,7 @@ import org.gradle.model.ModelMap
 import org.gradle.model.Mutate
 import org.gradle.model.Path
 import org.gradle.model.RuleSource
+import org.gradle.model.Unmanaged
 import org.gradle.nativeplatform.NativeBinarySpec
 import org.gradle.nativeplatform.toolchain.Gcc
 import org.gradle.nativeplatform.toolchain.NativeToolChain
@@ -47,11 +48,12 @@ interface CoveritySpec {
 
 @Managed
 interface CoverityStream extends Named {
-    String getPlatform()
-    void setPlatform(String platform)
-
     String getStream()
     void setStream(String stream)
+
+    @Unmanaged
+    Closure<Boolean> getFilter()
+    void setFilter(Closure<Boolean> filter)
 }
 
 class CoverityPlugin extends RuleSource {
@@ -72,6 +74,10 @@ class CoverityPlugin extends RuleSource {
         coverity.authKeyFile = new File(System.getProperty('user.home'), '.coverity_key')
         coverity.intermediatesDir = new File(buildDir, 'coverity-intermediates')
         coverity.resultsFile = new File(buildDir, 'coverity-results/results.txt')
+
+        coverity.streams.beforeEach {
+            filter = { true }
+        }
     }
 
     @Mutate
@@ -115,7 +121,7 @@ class CoverityPlugin extends RuleSource {
 
         // Create one task per native platform
         coverity.streams.each { stream ->
-            def taskName = "coverity${stream.platform.capitalize()}"
+            def taskName = "coverity${stream.stream.capitalize()}"
             tasks.create(taskName, Exec)
             def task = tasks.get(taskName)
 
@@ -137,11 +143,8 @@ class CoverityPlugin extends RuleSource {
                 }
             }
 
-            // Create sub-tasks for each binary on this platform
-            binaries.findAll {
-                it in NativeBinarySpec &&
-                it.targetPlatform.name == stream.platform
-            }.each {
+            // Create sub-tasks for each binary on this stream
+            binaries.findAll(stream.filter).each {
                 createNativeCoverityTask(it, coverity, task)
             }
         }
