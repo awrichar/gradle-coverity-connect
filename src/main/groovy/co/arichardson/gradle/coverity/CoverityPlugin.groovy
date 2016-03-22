@@ -4,6 +4,8 @@ import org.gradle.api.GradleException
 import org.gradle.api.Named
 import org.gradle.api.Task
 import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.jvm.JarBinarySpec
 import org.gradle.language.base.LanguageSourceSet
 import org.gradle.language.c.tasks.CCompile
 import org.gradle.language.cpp.tasks.CppCompile
@@ -108,15 +110,6 @@ class CoverityPlugin extends RuleSource {
 
         tasks.create('coverity', Task)
         def mainTask = tasks.get('coverity')
-
-        createNativeCoverityTasks(tasks, binaries, coverity, mainTask)
-    }
-
-    private void createNativeCoverityTasks(ModelMap<Task> tasks,
-            ModelMap<BinarySpec> binaries,
-            CoveritySpec coverity,
-            Task mainTask) {
-
         def covRun = findCoverityTool('cov-run-desktop', coverity.path)
 
         // Create one task per native platform
@@ -134,6 +127,11 @@ class CoverityPlugin extends RuleSource {
             addHostConfig(task, coverity)
             task.args(*coverity.args)
 
+            task.doFirst {
+                coverity.intermediatesDir.mkdirs()
+                coverity.resultsFile.parentFile.mkdirs()
+            }
+
             task.ignoreExitValue = true
             task.doLast {
                 if (execResult.exitValue == COVERITY_AUTH_KEY_NOT_FOUND) {
@@ -145,7 +143,11 @@ class CoverityPlugin extends RuleSource {
 
             // Create sub-tasks for each binary on this stream
             binaries.findAll(stream.filter).each {
-                createNativeCoverityTask(it, coverity, task)
+                if (it in NativeBinarySpec) {
+                    createNativeCoverityTask(it, coverity, task)
+                } else if (it in JarBinarySpec) {
+                    createJavaCoverityTask(it, coverity, task)
+                }
             }
         }
     }
@@ -179,6 +181,35 @@ class CoverityPlugin extends RuleSource {
                     task.args '--dir', coverity.intermediatesDir
                     task.args compiler, "@${optionsFile}"
                     task.args sourceFile.path
+                }
+            }
+        }
+    }
+
+    private void createJavaCoverityTask(JarBinarySpec binary,
+            CoveritySpec coverity, Exec coverityTask) {
+
+        def covEmitJava = findCoverityTool('cov-emit-java', coverity.path)
+
+        binary.tasks.withType(JavaCompile) { compileTask ->
+            // Create a cov-emit-java task for each source file
+            def taskName = binary.tasks.taskName('coverity')
+            binary.tasks.create(taskName, Exec) { task ->
+                task.dependsOn compileTask
+                coverityTask.dependsOn task
+
+                task.executable covEmitJava
+                task.args '--dir', coverity.intermediatesDir
+                task.args '--compiler-outputs', compileTask.destinationDir.path
+                task.args '--classpath', compileTask.classpath.asPath
+                task.args '--bootclasspath', compileTask.options.bootClasspath
+                task.args '--encoding', compileTask.options.encoding
+                task.args '--source', compileTask.sourceCompatibility
+
+                compileTask.source.files.each { sourceFile ->
+                    // Add this file to the list for the cov-run-desktop task
+                    coverityTask.args sourceFile
+                    task.args sourceFile
                 }
             }
         }
