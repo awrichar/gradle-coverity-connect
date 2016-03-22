@@ -35,6 +35,4 @@ The following properties can be set on the `coverity` block:
 * **port:** port for the Coverity Connect server (default: 8080)
 * **path:** path to Coverity tools folder (default: looks in COVERITY_HOME or in PATH)
 * **authKeyFile:** path to the authentication key for Coverity Connect (default: ~/.coverity_key)
-* **intermediatesDir:** path to store Coverity intermediates (default: $buildDir/coverity-intermediaes)
-* **resultsFile:** path to output Coverity results (default: $buildDir/coverity-results/results.txt)
 

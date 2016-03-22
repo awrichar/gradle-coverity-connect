@@ -37,12 +37,6 @@ interface CoveritySpec {
     File getAuthKeyFile()
     void setAuthKeyFile(File key)
 
-    File getIntermediatesDir()
-    void setIntermediatesDir(File dir)
-
-    File getResultsFile()
-    void setResultsFile(File results)
-
     List<String> getArgs()
 
     ModelMap<CoverityStream> getStreams()
@@ -60,6 +54,9 @@ interface CoverityStream extends Named {
 
 class CoverityConnectPlugin extends RuleSource {
     private static final int COVERITY_AUTH_KEY_NOT_FOUND = 4
+    private static final String INTERMEDIATES_DIR = 'coverity-intermediates'
+    private static final String RESULTS_DIR = 'coverity-results'
+    private static final String RESULTS_FILE = 'results.txt'
 
     /**
      * Create the model.coverity block
@@ -71,18 +68,13 @@ class CoverityConnectPlugin extends RuleSource {
      * Set defaults for the coverity block
      */
     @Defaults
-    void setCoverityDefaults(CoveritySpec coverity,
-            @Path('buildDir') File buildDir) {
-
+    void setCoverityDefaults(CoveritySpec coverity) {
         if ('COVERITY_HOME' in System.env) {
             coverity.path = new File(System.env.COVERITY_HOME)
         }
 
         coverity.port = '8080'
         coverity.authKeyFile = new File(System.getProperty('user.home'), '.coverity_key')
-        coverity.intermediatesDir = new File(buildDir, 'coverity-intermediates')
-        coverity.resultsFile = new File(buildDir, 'coverity-results/results.txt')
-
         coverity.streams.beforeEach {
             filter = { true }
         }
@@ -118,31 +110,37 @@ class CoverityConnectPlugin extends RuleSource {
     @Mutate
     void createCoverityTasks(ModelMap<Task> tasks,
             @Path('binaries') ModelMap<BinarySpec> binaries,
-            CoveritySpec coverity) {
+            CoveritySpec coverity,
+            @Path('buildDir') File buildDir) {
 
         tasks.create('coverity', Task)
         def mainTask = tasks.get('coverity')
 
         def covRun = findCoverityTool('cov-run-desktop', coverity.path)
+        def mainIntermediates = new File(buildDir, INTERMEDIATES_DIR)
+        def mainResults = new File(buildDir, RESULTS_DIR)
 
         // Create one "run" task per stream
         coverity.streams.each { stream ->
-            def taskName = "coverity${stream.stream.capitalize()}"
+            def taskName = "coverity${stream.name.capitalize()}"
+            def intermediates = new File(mainIntermediates, stream.name)
+            def results = new File(mainResults, "${stream.name}/${RESULTS_FILE}")
+
             tasks.create(taskName, Exec)
             def task = tasks.get(taskName)
 
             mainTask.dependsOn task
             task.executable covRun
-            task.args '--dir', coverity.intermediatesDir
+            task.args '--dir', intermediates.path
             task.args '--stream', stream.stream
             task.args '--auth-key-file', coverity.authKeyFile
-            task.args '--text-output', coverity.resultsFile
+            task.args '--text-output', results
             addHostConfig(task, coverity)
             task.args(*coverity.args)
 
             task.doFirst {
-                coverity.intermediatesDir.mkdirs()
-                coverity.resultsFile.parentFile.mkdirs()
+                intermediates.mkdirs()
+                results.parentFile.mkdirs()
             }
 
             task.ignoreExitValue = true
@@ -153,15 +151,15 @@ class CoverityConnectPlugin extends RuleSource {
 
                 execResult.assertNormalExitValue()
 
-                logger.lifecycle("Static analysis complete. Results saved to ${coverity.resultsFile}")
+                logger.lifecycle("Static analysis complete. Results saved to ${results}")
             }
 
             // Create sub-tasks for each binary on this stream
             binaries.findAll(stream.filter).each {
                 if (it in NativeBinarySpec) {
-                    createNativeCoverityTask(it, coverity, task)
+                    createNativeCoverityTask(it, coverity, task, intermediates)
                 } else if (it in JarBinarySpec) {
-                    createJavaCoverityTask(it, coverity, task)
+                    createJavaCoverityTask(it, coverity, task, intermediates)
                 }
             }
         }
@@ -171,7 +169,7 @@ class CoverityConnectPlugin extends RuleSource {
      * Create static analysis tasks for native code
      */
     private void createNativeCoverityTask(NativeBinarySpec binary,
-            CoveritySpec coverity, Exec coverityTask) {
+            CoveritySpec coverity, Exec coverityTask, File intermediates) {
 
         def covTranslate = findCoverityTool('cov-translate', coverity.path)
 
@@ -196,7 +194,7 @@ class CoverityConnectPlugin extends RuleSource {
                     coverityTask.dependsOn task
 
                     task.executable covTranslate
-                    task.args '--dir', coverity.intermediatesDir
+                    task.args '--dir', intermediates.path
                     task.args compiler, "@${optionsFile}"
                     task.args sourceFile.path
                 }
@@ -208,7 +206,7 @@ class CoverityConnectPlugin extends RuleSource {
      * Create static analysis tasks for Java code
      */
     private void createJavaCoverityTask(JarBinarySpec binary,
-            CoveritySpec coverity, Exec coverityTask) {
+            CoveritySpec coverity, Exec coverityTask, File intermediates) {
 
         def covEmitJava = findCoverityTool('cov-emit-java', coverity.path)
 
@@ -220,7 +218,7 @@ class CoverityConnectPlugin extends RuleSource {
                 coverityTask.dependsOn task
 
                 task.executable covEmitJava
-                task.args '--dir', coverity.intermediatesDir
+                task.args '--dir', intermediates.path
                 task.args '--compiler-outputs', compileTask.destinationDir.path
                 task.args '--classpath', compileTask.classpath.asPath
                 task.args '--bootclasspath', compileTask.options.bootClasspath
