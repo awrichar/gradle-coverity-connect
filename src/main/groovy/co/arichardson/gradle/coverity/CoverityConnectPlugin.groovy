@@ -149,9 +149,11 @@ class CoverityConnectPlugin extends RuleSource {
             task.doLast {
                 if (execResult.exitValue == COVERITY_AUTH_KEY_NOT_FOUND) {
                     throw new GradleException("Authentication key was not found - please run 'gradle coverity-auth' to generate.")
-                } else {
-                    execResult.assertNormalExitValue()
                 }
+
+                execResult.assertNormalExitValue()
+
+                logger.lifecycle("Static analysis complete. Results saved to ${coverity.resultsFile}")
             }
 
             // Create sub-tasks for each binary on this stream
