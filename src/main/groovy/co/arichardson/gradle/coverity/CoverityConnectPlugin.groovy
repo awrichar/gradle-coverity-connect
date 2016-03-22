@@ -58,7 +58,7 @@ interface CoverityStream extends Named {
     void setFilter(Closure<Boolean> filter)
 }
 
-class CoverityPlugin extends RuleSource {
+class CoverityConnectPlugin extends RuleSource {
     private static final int COVERITY_AUTH_KEY_NOT_FOUND = 4
 
     /**
