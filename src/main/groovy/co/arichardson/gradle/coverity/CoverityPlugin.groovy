@@ -61,9 +61,15 @@ interface CoverityStream extends Named {
 class CoverityPlugin extends RuleSource {
     private static final int COVERITY_AUTH_KEY_NOT_FOUND = 4
 
+    /**
+     * Create the model.coverity block
+     */
     @Model
     void coverity(CoveritySpec spec) {}
 
+    /**
+     * Set defaults for the coverity block
+     */
     @Defaults
     void setCoverityDefaults(CoveritySpec coverity,
             @Path('buildDir') File buildDir) {
@@ -82,6 +88,9 @@ class CoverityPlugin extends RuleSource {
         }
     }
 
+    /**
+     * Create the coverity-auth task
+     */
     @Mutate
     void createCoverityAuthTask(ModelMap<Task> tasks, CoveritySpec coverity) {
         tasks.create('coverity-auth', Exec) {
@@ -103,6 +112,9 @@ class CoverityPlugin extends RuleSource {
         }
     }
 
+    /**
+     * Create the main coverity task for static analysis
+     */
     @Mutate
     void createCoverityTasks(ModelMap<Task> tasks,
             @Path('binaries') ModelMap<BinarySpec> binaries,
@@ -110,9 +122,10 @@ class CoverityPlugin extends RuleSource {
 
         tasks.create('coverity', Task)
         def mainTask = tasks.get('coverity')
+
         def covRun = findCoverityTool('cov-run-desktop', coverity.path)
 
-        // Create one task per native platform
+        // Create one "run" task per stream
         coverity.streams.each { stream ->
             def taskName = "coverity${stream.stream.capitalize()}"
             tasks.create(taskName, Exec)
@@ -152,6 +165,9 @@ class CoverityPlugin extends RuleSource {
         }
     }
 
+    /**
+     * Create static analysis tasks for native code
+     */
     private void createNativeCoverityTask(NativeBinarySpec binary,
             CoveritySpec coverity, Exec coverityTask) {
 
@@ -186,13 +202,16 @@ class CoverityPlugin extends RuleSource {
         }
     }
 
+    /**
+     * Create static analysis tasks for Java code
+     */
     private void createJavaCoverityTask(JarBinarySpec binary,
             CoveritySpec coverity, Exec coverityTask) {
 
         def covEmitJava = findCoverityTool('cov-emit-java', coverity.path)
 
         binary.tasks.withType(JavaCompile) { compileTask ->
-            // Create a cov-emit-java task for each source file
+            // Create a cov-emit-java task for each compile task
             def taskName = binary.tasks.taskName('coverity')
             binary.tasks.create(taskName, Exec) { task ->
                 task.dependsOn compileTask
