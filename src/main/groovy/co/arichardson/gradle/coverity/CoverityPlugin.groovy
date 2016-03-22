@@ -96,47 +96,59 @@ class CoverityPlugin extends RuleSource {
     }
 
     @Mutate
-    void createCoverityTasks(ModelMap<Task> tasks, CoveritySpec coverity,
-            @Path('binaries') ModelMap<BinarySpec> binaries) {
+    void createCoverityTasks(ModelMap<Task> tasks,
+            @Path('binaries') ModelMap<BinarySpec> binaries,
+            CoveritySpec coverity) {
 
-        tasks.create('coverity', Exec) { task ->
-            doFirst {
-                coverity.intermediatesDir.mkdirs()
-                coverity.resultsFile.parentFile.mkdirs()
-            }
+        tasks.create('coverity', Task)
+        def mainTask = tasks.get('coverity')
 
-            executable findCoverityTool('cov-run-desktop', coverity.path)
-            args '--dir', coverity.intermediatesDir
-            args '--stream', 'sl_master_BE'
-            args '--auth-key-file', coverity.authKeyFile
-            args '--text-output', coverity.resultsFile
+        createNativeCoverityTasks(tasks, binaries, coverity, mainTask)
+    }
+
+    private void createNativeCoverityTasks(ModelMap<Task> tasks,
+            ModelMap<BinarySpec> binaries,
+            CoveritySpec coverity,
+            Task mainTask) {
+
+        def covRun = findCoverityTool('cov-run-desktop', coverity.path)
+
+        // Create one task per native platform
+        coverity.streams.each { stream ->
+            def taskName = "coverity${stream.platform.capitalize()}"
+            tasks.create(taskName, Exec)
+            def task = tasks.get(taskName)
+
+            mainTask.dependsOn task
+            task.executable covRun
+            task.args '--dir', coverity.intermediatesDir
+            task.args '--stream', stream.stream
+            task.args '--auth-key-file', coverity.authKeyFile
+            task.args '--text-output', coverity.resultsFile
             addHostConfig(task, coverity)
-            args(*coverity.args)
+            task.args(*coverity.args)
 
-            binaries.each {
-                if (it in NativeBinarySpec) {
-                    createNativeCoverityTask(it, coverity, task)
-                }
-            }
-
-            ignoreExitValue = true
-            doLast {
+            task.ignoreExitValue = true
+            task.doLast {
                 if (execResult.exitValue == COVERITY_AUTH_KEY_NOT_FOUND) {
                     throw new GradleException("Authentication key was not found - please run 'gradle coverity-auth' to generate.")
                 } else {
                     execResult.assertNormalExitValue()
                 }
             }
+
+            // Create sub-tasks for each binary on this platform
+            binaries.findAll {
+                it in NativeBinarySpec &&
+                it.targetPlatform.name == stream.platform
+            }.each {
+                createNativeCoverityTask(it, coverity, task)
+            }
         }
     }
 
     private void createNativeCoverityTask(NativeBinarySpec binary,
             CoveritySpec coverity, Exec coverityTask) {
-
-        def stream = coverity.streams.find {
-            it.platform == binary.targetPlatform.name
-        }?.stream
-        if (!stream) return
 
         def covTranslate = findCoverityTool('cov-translate', coverity.path)
 
