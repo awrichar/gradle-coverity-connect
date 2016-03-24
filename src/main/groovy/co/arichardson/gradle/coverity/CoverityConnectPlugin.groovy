@@ -1,59 +1,23 @@
 package co.arichardson.gradle.coverity
 
 import org.gradle.api.GradleException
-import org.gradle.api.Named
 import org.gradle.api.Task
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.JarBinarySpec
-import org.gradle.language.base.LanguageSourceSet
-import org.gradle.language.c.tasks.CCompile
-import org.gradle.language.cpp.tasks.CppCompile
 import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
 import org.gradle.model.Defaults
-import org.gradle.model.Managed
 import org.gradle.model.Model
 import org.gradle.model.ModelMap
 import org.gradle.model.Mutate
 import org.gradle.model.Path
 import org.gradle.model.RuleSource
-import org.gradle.model.Unmanaged
 import org.gradle.nativeplatform.NativeBinarySpec
-import org.gradle.nativeplatform.toolchain.Gcc
-import org.gradle.nativeplatform.toolchain.NativeToolChain
 import org.gradle.platform.base.BinarySpec
-
-@Managed
-interface CoveritySpec {
-    File getPath()
-    void setPath(File path)
-
-    String getHost()
-    void setHost(String host)
-
-    String getPort()
-    void setPort(String port)
-
-    File getAuthKeyFile()
-    void setAuthKeyFile(File key)
-
-    List<String> getArgs()
-
-    ModelMap<CoverityStream> getStreams()
-}
-
-@Managed
-interface CoverityStream extends Named {
-    String getStream()
-    void setStream(String stream)
-
-    @Unmanaged
-    Closure<Boolean> getFilter()
-    void setFilter(Closure<Boolean> filter)
-}
 
 class CoverityConnectPlugin extends RuleSource {
     private static final int COVERITY_AUTH_KEY_NOT_FOUND = 4
+
     private static final String INTERMEDIATES_DIR = 'coverity-intermediates'
     private static final String RESULTS_DIR = 'coverity-results'
     private static final String RESULTS_FILE = 'results.txt'
@@ -86,7 +50,7 @@ class CoverityConnectPlugin extends RuleSource {
     @Mutate
     void createCoverityAuthTask(ModelMap<Task> tasks, CoveritySpec coverity) {
         tasks.create('coverity-auth', Exec) {
-            executable findCoverityTool('cov-manage-im', coverity.path)
+            executable Utils.findCoverityTool('cov-manage-im', coverity.path)
             args '--mode', 'auth-key', '--create'
             args '--output-file', coverity.authKeyFile
             addHostConfig(it, coverity)
@@ -116,7 +80,7 @@ class CoverityConnectPlugin extends RuleSource {
         tasks.create('coverity', Task)
         def mainTask = tasks.get('coverity')
 
-        def covRun = findCoverityTool('cov-run-desktop', coverity.path)
+        def covRun = Utils.findCoverityTool('cov-run-desktop', coverity.path)
         def mainIntermediates = new File(buildDir, INTERMEDIATES_DIR)
         def mainResults = new File(buildDir, RESULTS_DIR)
 
@@ -171,11 +135,11 @@ class CoverityConnectPlugin extends RuleSource {
     private void createNativeCoverityTask(NativeBinarySpec binary,
             CoveritySpec coverity, Exec coverityTask, File intermediates) {
 
-        def covTranslate = findCoverityTool('cov-translate', coverity.path)
+        def covTranslate = Utils.findCoverityTool('cov-translate', coverity.path)
 
         binary.tasks.withType(AbstractNativeCompileTask) { compileTask ->
             // Locate the compiler binary
-            def compiler = findGccCompiler(binary.toolChain, compileTask)
+            def compiler = Utils.findGccCompiler(binary.toolChain, compileTask)
             if (compiler == null) {
                 coverityTask.doFirst {
                     throw new GradleException("Could not infer GCC compiler for: ${compileTask}")
@@ -211,7 +175,7 @@ class CoverityConnectPlugin extends RuleSource {
     private void createJavaCoverityTask(JarBinarySpec binary,
             CoveritySpec coverity, Exec coverityTask, File intermediates) {
 
-        def covEmitJava = findCoverityTool('cov-emit-java', coverity.path)
+        def covEmitJava = Utils.findCoverityTool('cov-emit-java', coverity.path)
 
         binary.tasks.withType(JavaCompile) { compileTask ->
             // Create a cov-emit-java task for each compile task
@@ -237,7 +201,7 @@ class CoverityConnectPlugin extends RuleSource {
         }
     }
 
-    private void addHostConfig(Exec task, CoveritySpec coverity) {
+    private static void addHostConfig(Exec task, CoveritySpec coverity) {
         if (coverity.host != null) {
             task.args '--host', coverity.host
         } else {
@@ -247,34 +211,5 @@ class CoverityConnectPlugin extends RuleSource {
         if (coverity.port != null) {
             task.args '--port', coverity.port
         }
-    }
-
-    private String findCoverityTool(String toolName, File coverityPath) {
-        if (coverityPath != null) {
-            return new File(coverityPath, "bin/${toolName}").path
-        }
-
-        return toolName
-    }
-
-    private File findGccTool(NativeToolChain toolChain, String toolName) {
-        if (!(toolChain in Gcc)) return null
-
-        def tools = []
-        toolChain.path*.eachFile { tools << it }
-        return tools.find {
-            it.name == toolName || it.name.endsWith("-${toolName}")
-        }
-    }
-
-    // TODO: Find a way to identify the compilers actually configured by Gradle
-    private File findGccCompiler(NativeToolChain toolChain, AbstractNativeCompileTask compileTask) {
-        if (compileTask in CCompile) {
-            return findGccTool(toolChain, 'gcc')
-        } else if (compileTask in CppCompile) {
-            return findGccTool(toolChain, 'g++')
-        }
-
-        return null
     }
 }
