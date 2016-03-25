@@ -16,6 +16,8 @@ ext {
     if (!project.hasProperty('publishPassword')) publishPassword = null
 }
 
+targetCompatibility = '1.6'
+
 publishing {
     repositories {
         maven {
