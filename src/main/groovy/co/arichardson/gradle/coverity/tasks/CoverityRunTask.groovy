@@ -6,8 +6,11 @@ import org.gradle.api.GradleException
 class CoverityRunTask extends AbstractCoverityIntermediatesTask {
     private static final int COVERITY_AUTH_KEY_NOT_FOUND = 4
 
+    final List<File> sourceFiles
+
     public CoverityRunTask() {
         super()
+        sourceFiles = new ArrayList<File>()
 
         executable Utils.findCoverityTool('cov-run-desktop', coverity.path)
         args '--auth-key-file', coverity.authKeyFile
@@ -15,12 +18,40 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
         args(*coverity.args)
     }
 
+    private String findGitRoot() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream()
+        project.exec {
+            commandLine 'git', 'rev-parse', '--show-toplevel'
+            standardOutput = output
+        }
+        return output.toString().trim()
+    }
+
     @Override
     protected void exec() {
-        args = ['--stream', stream.stream, '--text-output', resultsFile.path] + args
+        List<String> extraArgs = [
+            '--stream', stream.stream, '--text-output', resultsFile.path
+        ]
+
+        if (coverity.scm) {
+            extraArgs << '--scm' << coverity.scm
+
+            if (coverity.scm == 'git') {
+                extraArgs << '--scm-project-root' << findGitRoot()
+            }
+        }
+
+        if (coverity.analyzeScmModified) {
+            extraArgs << '--analyze-scm-modified'
+            extraArgs << '--restrict-modified-file-regex'
+            extraArgs << sourceFiles.join('|')
+        } else {
+            args += sourceFiles
+        }
 
         resultsFile.parentFile.mkdirs()
 
+        args = extraArgs + args
         ignoreExitValue = true
         super.exec()
 

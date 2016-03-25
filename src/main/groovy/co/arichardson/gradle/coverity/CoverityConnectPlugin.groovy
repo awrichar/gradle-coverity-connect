@@ -6,7 +6,6 @@ import co.arichardson.gradle.coverity.tasks.CoverityRunTask
 import co.arichardson.gradle.coverity.tasks.CoverityTranslateTask
 import org.gradle.api.Task
 import org.gradle.api.tasks.Delete
-import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.JarBinarySpec
 import org.gradle.language.base.LanguageSourceSet
@@ -60,8 +59,8 @@ class CoverityConnectPlugin extends RuleSource {
      */
     @Mutate
     void createCoverityTasks(ModelMap<Task> tasks,
-            @Path('binaries') ModelMap<BinarySpec> binaries,
-            CoveritySpec coverity) {
+                             @Path('binaries') ModelMap<BinarySpec> binaries,
+                             CoveritySpec coverity) {
 
         if (!coverity.enabled) return
 
@@ -105,11 +104,14 @@ class CoverityConnectPlugin extends RuleSource {
     /**
      * Create static analysis tasks for native code
      */
-    private static void createNativeCoverityTask(NativeBinarySpec binary, Exec coverityTask, CoverityStream stream) {
+    private static void createNativeCoverityTask(NativeBinarySpec binary,
+                                                 CoverityRunTask coverityTask,
+                                                 CoverityStream stream) {
+
         // Add all input files to the main Coverity task
         binary.inputs.each { LanguageSourceSet sourceSet ->
             sourceSet.source.files.each { File sourceFile ->
-                coverityTask.args sourceFile.path
+                coverityTask.sourceFiles << sourceFile
             }
         }
 
@@ -132,11 +134,14 @@ class CoverityConnectPlugin extends RuleSource {
     /**
      * Create static analysis tasks for Java code
      */
-    private static void createJavaCoverityTask(JarBinarySpec binary, Exec coverityTask, CoverityStream stream) {
+    private static void createJavaCoverityTask(JarBinarySpec binary,
+                                               CoverityRunTask coverityTask,
+                                               CoverityStream stream) {
+
         // Add all input files to the main Coverity task
         binary.inputs.findAll{ it in JavaSourceSet }.each { JavaSourceSet sourceSet ->
             sourceSet.source.files.each { File sourceFile ->
-                coverityTask.args sourceFile.path
+                coverityTask.sourceFiles << sourceFile
             }
         }
 

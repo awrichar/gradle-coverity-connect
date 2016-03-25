@@ -20,6 +20,12 @@ interface CoveritySpec {
     File getAuthKeyFile()
     void setAuthKeyFile(File key)
 
+    String getScm()
+    void setScm(String scm)
+
+    boolean getAnalyzeScmModified()
+    void setAnalyzeScmModified(boolean analyzeScmModified)
+
     List<String> getArgs()
 
     ModelMap<CoverityStream> getStreams()
