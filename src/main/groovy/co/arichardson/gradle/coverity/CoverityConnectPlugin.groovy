@@ -6,6 +6,7 @@ import co.arichardson.gradle.coverity.tasks.CoverityRunTask
 import co.arichardson.gradle.coverity.tasks.CoverityTranslateTask
 import org.gradle.api.GradleException
 import org.gradle.api.Task
+import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.JarBinarySpec
@@ -66,6 +67,7 @@ class CoverityConnectPlugin extends RuleSource {
         if (!coverity.enabled) return
 
         Task mainTask = Utils.addTask(tasks, 'coverity', Task)
+        Task mainCleanTask = Utils.addTask(tasks, 'cleanCoverity', Task)
 
         // Create one "run" task per stream
         coverity.streams.each { CoverityStream stream ->
@@ -79,17 +81,23 @@ class CoverityConnectPlugin extends RuleSource {
             if (!hasSources) return
 
             String taskName = "coverity${stream.name.capitalize()}"
-            CoverityRunTask task = Utils.addTask(tasks, taskName, CoverityRunTask) as CoverityRunTask
+            String cleanTaskName = "clean${taskName}"
+            CoverityRunTask runTask = Utils.addTask(tasks, taskName, CoverityRunTask) as CoverityRunTask
+            Delete cleanTask = Utils.addTask(tasks, cleanTaskName, Delete) as Delete
 
-            mainTask.dependsOn task
-            task.stream = stream
+            mainTask.dependsOn runTask
+            mainCleanTask.dependsOn cleanTask
+
+            runTask.stream = stream
+            cleanTask.delete runTask.intermediatesDir
+            cleanTask.delete runTask.resultsFile
 
             // Create sub-tasks for each binary on this stream
             matchedBinaries.each { BinarySpec binary ->
                 if (binary in NativeBinarySpec) {
-                    createNativeCoverityTask(binary, task, stream)
+                    createNativeCoverityTask(binary, runTask, stream)
                 } else if (binary in JarBinarySpec) {
-                    createJavaCoverityTask(binary, task, stream)
+                    createJavaCoverityTask(binary, runTask, stream)
                 }
             }
         }

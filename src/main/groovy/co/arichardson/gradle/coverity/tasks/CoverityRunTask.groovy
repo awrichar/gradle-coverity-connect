@@ -33,7 +33,7 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
         logger.lifecycle("Static analysis complete. Results saved to ${resultsFile}")
     }
 
-    protected File getResultsFile() {
+    public File getResultsFile() {
         File mainResults = new File(project.buildDir, RESULTS_DIR)
         return new File(mainResults, "${stream.name}/${RESULTS_FILE}")
     }

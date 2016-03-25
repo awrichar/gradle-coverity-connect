@@ -20,7 +20,7 @@ abstract class AbstractCoverityIntermediatesTask extends AbstractCoverityTask {
         super.exec()
     }
 
-    protected File getIntermediatesDir() {
+    public File getIntermediatesDir() {
         File mainIntermediates = new File(project.buildDir, INTERMEDIATES_DIR)
         return new File(mainIntermediates, stream.name)
     }
