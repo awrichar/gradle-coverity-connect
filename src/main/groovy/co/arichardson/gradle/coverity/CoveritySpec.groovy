@@ -5,6 +5,9 @@ import org.gradle.model.ModelMap
 
 @Managed
 interface CoveritySpec {
+    boolean getEnabled()
+    void setEnabled(boolean enabled)
+
     File getPath()
     void setPath(File path)
 

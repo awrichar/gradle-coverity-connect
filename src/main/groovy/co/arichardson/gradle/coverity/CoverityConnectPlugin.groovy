@@ -9,6 +9,7 @@ import org.gradle.api.Task
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.JarBinarySpec
+import org.gradle.language.base.LanguageSourceSet
 import org.gradle.language.java.JavaSourceSet
 import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
 import org.gradle.model.Defaults
@@ -38,6 +39,7 @@ class CoverityConnectPlugin extends RuleSource {
             coverity.path = new File(System.env.COVERITY_HOME)
         }
 
+        coverity.enabled = true
         coverity.port = '8080'
         coverity.authKeyFile = new File(System.getProperty('user.home'), COVERITY_KEY_FILE)
         coverity.streams.beforeEach {
@@ -61,10 +63,21 @@ class CoverityConnectPlugin extends RuleSource {
             @Path('binaries') ModelMap<BinarySpec> binaries,
             CoveritySpec coverity) {
 
+        if (!coverity.enabled) return
+
         Task mainTask = Utils.addTask(tasks, 'coverity', Task)
 
         // Create one "run" task per stream
         coverity.streams.each { CoverityStream stream ->
+            // Ensure there are some sources matching this stream
+            List<BinarySpec> matchedBinaries = binaries.findAll(stream.filter)
+            boolean hasSources = matchedBinaries.find { BinarySpec binary ->
+                binary.inputs.find { LanguageSourceSet sourceSet ->
+                    sourceSet.source.files.size() > 0
+                }
+            }
+            if (!hasSources) return
+
             String taskName = "coverity${stream.name.capitalize()}"
             CoverityRunTask task = Utils.addTask(tasks, taskName, CoverityRunTask) as CoverityRunTask
 
@@ -72,11 +85,11 @@ class CoverityConnectPlugin extends RuleSource {
             task.stream = stream
 
             // Create sub-tasks for each binary on this stream
-            binaries.findAll(stream.filter).each {
-                if (it in NativeBinarySpec) {
-                    createNativeCoverityTask(it, task, stream)
-                } else if (it in JarBinarySpec) {
-                    createJavaCoverityTask(it, task, stream)
+            matchedBinaries.each { BinarySpec binary ->
+                if (binary in NativeBinarySpec) {
+                    createNativeCoverityTask(binary, task, stream)
+                } else if (binary in JarBinarySpec) {
+                    createJavaCoverityTask(binary, task, stream)
                 }
             }
         }
@@ -87,7 +100,7 @@ class CoverityConnectPlugin extends RuleSource {
      */
     private static void createNativeCoverityTask(NativeBinarySpec binary, Exec coverityTask, CoverityStream stream) {
         // Add all input files to the main Coverity task
-        binary.inputs.each { sourceSet ->
+        binary.inputs.each { LanguageSourceSet sourceSet ->
             sourceSet.source.files.each { File sourceFile ->
                 coverityTask.args sourceFile.path
             }
@@ -127,7 +140,7 @@ class CoverityConnectPlugin extends RuleSource {
      */
     private static void createJavaCoverityTask(JarBinarySpec binary, Exec coverityTask, CoverityStream stream) {
         // Add all input files to the main Coverity task
-        binary.inputs.findAll{ it in JavaSourceSet }.each { sourceSet ->
+        binary.inputs.findAll{ it in JavaSourceSet }.each { JavaSourceSet sourceSet ->
             sourceSet.source.files.each { File sourceFile ->
                 coverityTask.args sourceFile.path
             }

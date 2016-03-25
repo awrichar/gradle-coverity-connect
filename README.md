@@ -31,8 +31,9 @@ You can restrict the static analysis to specific binaries using the `filter` pro
 
 The following properties can be set on the `coverity` block:
 
-* **host:** hostname for the Coverity Connect server
+* **host:** hostname for the Coverity Connect server (required)
 * **port:** port for the Coverity Connect server (default: 8080)
 * **path:** path to Coverity tools folder (default: looks in COVERITY_HOME or in PATH)
 * **authKeyFile:** path to the authentication key for Coverity Connect (default: ~/.coverity_key)
+* **enabled:** whether to run Coverity for this project (default: true)
 
