@@ -28,9 +28,11 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
     }
 
     @Override
-    protected void exec() {
+    protected void preExec() {
+        super.preExec()
+
         List<String> extraArgs = [
-            '--stream', stream.stream, '--text-output', resultsFile.path
+                '--stream', stream.stream, '--text-output', resultsFile.path
         ]
 
         if (coverity.scm) {
@@ -52,6 +54,10 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
         resultsFile.parentFile.mkdirs()
 
         args = extraArgs + args
+    }
+
+    @Override
+    protected void exec() {
         ignoreExitValue = true
         super.exec()
 

@@ -13,7 +13,9 @@ class CoverityAuthTask extends AbstractCoverityTask {
     }
 
     @Override
-    protected void exec() {
+    protected void preExec() {
+        super.preExec()
+
         def console = System.console()
         if (!console) {
             throw new GradleException('Could not open an interactive console - if you are running in daemon mode, please try using --no-daemon instead.')
@@ -22,7 +24,5 @@ class CoverityAuthTask extends AbstractCoverityTask {
         def prefix = 'Please enter your credentials for Coverity Connect.'
         args '--user', console.readLine("\n${prefix}\nUsername: ")
         args '--password', new String(console.readPassword("Password: "))
-
-        super.exec()
     }
 }

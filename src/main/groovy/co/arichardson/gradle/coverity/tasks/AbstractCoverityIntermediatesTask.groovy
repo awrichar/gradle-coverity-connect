@@ -14,10 +14,11 @@ abstract class AbstractCoverityIntermediatesTask extends AbstractCoverityTask {
     }
 
     @Override
-    protected void exec() {
+    protected void preExec() {
+        super.preExec()
+
         args = ['--dir', intermediatesDir.path] + args
         intermediatesDir.mkdirs()
-        super.exec()
     }
 
     public File getIntermediatesDir() {

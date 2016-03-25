@@ -22,4 +22,14 @@ abstract class AbstractCoverityTask extends Exec {
             args '--port', coverity.port
         }
     }
+
+    @Override
+    protected void exec() {
+        preExec();
+        super.exec()
+    }
+
+    protected void preExec() {
+        // do nothing (can be overriden)
+    }
 }

@@ -12,14 +12,13 @@ class CoverityEmitJavaTask extends AbstractCoverityIntermediatesTask {
     }
 
     @Override
-    protected void exec() {
+    protected void preExec() {
+        super.preExec()
         args '--compiler-outputs', compileTask.destinationDir.path
         args '--classpath', compileTask.classpath.asPath
         args '--bootclasspath', compileTask.options.bootClasspath
         args '--encoding', compileTask.options.encoding
         args '--source', compileTask.sourceCompatibility
         compileTask.source.files.each { args it.path }
-
-        super.exec()
     }
 }

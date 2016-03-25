@@ -42,7 +42,7 @@ class CoverityConnectPlugin extends RuleSource {
         coverity.port = '8080'
         coverity.authKeyFile = new File(System.getProperty('user.home'), COVERITY_KEY_FILE)
         coverity.streams.beforeEach {
-            filter = { true }
+            it.filter = { true }
         }
     }
 
@@ -117,16 +117,13 @@ class CoverityConnectPlugin extends RuleSource {
 
         // Create a cov-translate task for each source file in each compile task
         binary.tasks.withType(AbstractNativeCompileTask) { AbstractNativeCompileTask compileTask ->
-            compileTask.source.files.each { File sourceFile ->
-                def taskName = binary.tasks.taskName('coverity', sourceFile.name)
-                binary.tasks.create(taskName, CoverityTranslateTask) { CoverityTranslateTask task ->
-                    task.stream = stream
-                    task.compileTask = compileTask
-                    task.sourceFile sourceFile
+            def taskName = binary.tasks.taskName('coverity')
+            binary.tasks.create(taskName, CoverityTranslateTask) { CoverityTranslateTask task ->
+                task.stream = stream
+                task.compileTask = compileTask
 
-                    task.dependsOn compileTask
-                    coverityTask.dependsOn task
-                }
+                task.dependsOn compileTask
+                coverityTask.dependsOn task
             }
         }
     }
