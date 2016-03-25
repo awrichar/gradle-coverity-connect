@@ -117,7 +117,7 @@ class CoverityConnectPlugin extends RuleSource {
 
         // Create a cov-translate task for each source file in each compile task
         binary.tasks.withType(AbstractNativeCompileTask) { AbstractNativeCompileTask compileTask ->
-            def taskName = binary.tasks.taskName('coverity')
+            def taskName = coverityTask.name + compileTask.name.capitalize()
             binary.tasks.create(taskName, CoverityTranslateTask) { CoverityTranslateTask task ->
                 task.stream = stream
                 task.compileTask = compileTask
@@ -144,7 +144,7 @@ class CoverityConnectPlugin extends RuleSource {
 
         // Create a cov-emit-java task for each compile task
         binary.tasks.withType(JavaCompile) { compileTask ->
-            def taskName = binary.tasks.taskName('coverity')
+            def taskName = coverityTask.name + compileTask.name.capitalize()
             binary.tasks.create(taskName, CoverityEmitJavaTask) { CoverityEmitJavaTask task ->
                 task.stream = stream
                 task.compileTask = compileTask
