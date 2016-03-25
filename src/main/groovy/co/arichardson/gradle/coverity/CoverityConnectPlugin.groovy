@@ -1,10 +1,15 @@
 package co.arichardson.gradle.coverity
 
+import co.arichardson.gradle.coverity.tasks.CoverityAuthTask
+import co.arichardson.gradle.coverity.tasks.CoverityEmitJavaTask
+import co.arichardson.gradle.coverity.tasks.CoverityRunTask
+import co.arichardson.gradle.coverity.tasks.CoverityTranslateTask
 import org.gradle.api.GradleException
 import org.gradle.api.Task
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.JarBinarySpec
+import org.gradle.language.java.JavaSourceSet
 import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
 import org.gradle.model.Defaults
 import org.gradle.model.Model
@@ -16,11 +21,7 @@ import org.gradle.nativeplatform.NativeBinarySpec
 import org.gradle.platform.base.BinarySpec
 
 class CoverityConnectPlugin extends RuleSource {
-    private static final int COVERITY_AUTH_KEY_NOT_FOUND = 4
-
-    private static final String INTERMEDIATES_DIR = 'coverity-intermediates'
-    private static final String RESULTS_DIR = 'coverity-results'
-    private static final String RESULTS_FILE = 'results.txt'
+    public static final String COVERITY_KEY_FILE = '.coverity_key'
 
     /**
      * Create the model.coverity block
@@ -38,7 +39,7 @@ class CoverityConnectPlugin extends RuleSource {
         }
 
         coverity.port = '8080'
-        coverity.authKeyFile = new File(System.getProperty('user.home'), '.coverity_key')
+        coverity.authKeyFile = new File(System.getProperty('user.home'), COVERITY_KEY_FILE)
         coverity.streams.beforeEach {
             filter = { true }
         }
@@ -48,24 +49,8 @@ class CoverityConnectPlugin extends RuleSource {
      * Create the coverity-auth task
      */
     @Mutate
-    void createCoverityAuthTask(ModelMap<Task> tasks, CoveritySpec coverity) {
-        tasks.create('coverity-auth', Exec) {
-            executable Utils.findCoverityTool('cov-manage-im', coverity.path)
-            args '--mode', 'auth-key', '--create'
-            args '--output-file', coverity.authKeyFile
-            addHostConfig(it, coverity)
-
-            doFirst {
-                def console = System.console()
-                if (!console) {
-                    throw new GradleException('Could not open an interactive console - if you are running in daemon mode, please try using --no-daemon instead.')
-                }
-
-                def prefix = 'Please enter your Coverity credentials.'
-                args '--user', console.readLine("\n${prefix}\nUsername: ")
-                args '--password', new String(console.readPassword("Password: "))
-            }
-        }
+    void createCoverityAuthTask(ModelMap<Task> tasks) {
+        tasks.create('coverity-auth', CoverityAuthTask)
     }
 
     /**
@@ -74,56 +59,24 @@ class CoverityConnectPlugin extends RuleSource {
     @Mutate
     void createCoverityTasks(ModelMap<Task> tasks,
             @Path('binaries') ModelMap<BinarySpec> binaries,
-            CoveritySpec coverity,
-            @Path('buildDir') File buildDir) {
+            CoveritySpec coverity) {
 
-        tasks.create('coverity', Task)
-        def mainTask = tasks.get('coverity')
-
-        def covRun = Utils.findCoverityTool('cov-run-desktop', coverity.path)
-        def mainIntermediates = new File(buildDir, INTERMEDIATES_DIR)
-        def mainResults = new File(buildDir, RESULTS_DIR)
+        Task mainTask = Utils.addTask(tasks, 'coverity', Task)
 
         // Create one "run" task per stream
-        coverity.streams.each { stream ->
-            def taskName = "coverity${stream.name.capitalize()}"
-            def intermediates = new File(mainIntermediates, stream.name)
-            def results = new File(mainResults, "${stream.name}/${RESULTS_FILE}")
-
-            tasks.create(taskName, Exec)
-            def task = tasks.get(taskName)
+        coverity.streams.each { CoverityStream stream ->
+            String taskName = "coverity${stream.name.capitalize()}"
+            CoverityRunTask task = Utils.addTask(tasks, taskName, CoverityRunTask) as CoverityRunTask
 
             mainTask.dependsOn task
-            task.executable covRun
-            task.args '--dir', intermediates.path
-            task.args '--stream', stream.stream
-            task.args '--auth-key-file', coverity.authKeyFile
-            task.args '--text-output', results
-            addHostConfig(task, coverity)
-            task.args(*coverity.args)
-
-            task.doFirst {
-                intermediates.mkdirs()
-                results.parentFile.mkdirs()
-            }
-
-            task.ignoreExitValue = true
-            task.doLast {
-                if (execResult.exitValue == COVERITY_AUTH_KEY_NOT_FOUND) {
-                    throw new GradleException("Authentication key was not found - please run 'gradle coverity-auth' to generate.")
-                }
-
-                execResult.assertNormalExitValue()
-
-                logger.lifecycle("Static analysis complete. Results saved to ${results}")
-            }
+            task.stream = stream
 
             // Create sub-tasks for each binary on this stream
             binaries.findAll(stream.filter).each {
                 if (it in NativeBinarySpec) {
-                    createNativeCoverityTask(it, coverity, task, intermediates)
+                    createNativeCoverityTask(it, task, stream)
                 } else if (it in JarBinarySpec) {
-                    createJavaCoverityTask(it, coverity, task, intermediates)
+                    createJavaCoverityTask(it, task, stream)
                 }
             }
         }
@@ -132,14 +85,18 @@ class CoverityConnectPlugin extends RuleSource {
     /**
      * Create static analysis tasks for native code
      */
-    private void createNativeCoverityTask(NativeBinarySpec binary,
-            CoveritySpec coverity, Exec coverityTask, File intermediates) {
+    private static void createNativeCoverityTask(NativeBinarySpec binary, Exec coverityTask, CoverityStream stream) {
+        // Add all input files to the main Coverity task
+        binary.inputs.each { sourceSet ->
+            sourceSet.source.files.each { File sourceFile ->
+                coverityTask.args sourceFile.path
+            }
+        }
 
-        def covTranslate = Utils.findCoverityTool('cov-translate', coverity.path)
-
-        binary.tasks.withType(AbstractNativeCompileTask) { compileTask ->
+        // Add tasks for each compile step in the binary
+        binary.tasks.withType(AbstractNativeCompileTask) { AbstractNativeCompileTask compileTask ->
             // Locate the compiler binary
-            def compiler = Utils.findGccCompiler(binary.toolChain, compileTask)
+            def compiler = Utils.findGccCompiler(compileTask.toolChain, compileTask)
             if (compiler == null) {
                 coverityTask.doFirst {
                     throw new GradleException("Could not infer GCC compiler for: ${compileTask}")
@@ -148,22 +105,18 @@ class CoverityConnectPlugin extends RuleSource {
             }
 
             // Locate the options file generated by the compile task
-            def optionsFile = new File(temporaryDir, 'options.txt')
+            def optionsFile = new File(compileTask.temporaryDir, 'options.txt')
 
-            compileTask.source.files.each { sourceFile ->
-                // Add this file to the list for the cov-run-desktop task
-                coverityTask.args sourceFile
-
-                // Create a cov-translate task for each source file
+            // Create a cov-translate task for each source file
+            compileTask.source.files.each { File sourceFile ->
                 def taskName = binary.tasks.taskName('coverity', sourceFile.name)
-                binary.tasks.create(taskName, Exec) { task ->
+                binary.tasks.create(taskName, CoverityTranslateTask) { CoverityTranslateTask task ->
+                    task.stream = stream
+                    task.compileTask = compileTask
+                    task.sourceFile sourceFile
+
                     task.dependsOn compileTask
                     coverityTask.dependsOn task
-
-                    task.executable covTranslate
-                    task.args '--dir', intermediates.path
-                    task.args compiler, "@${optionsFile}"
-                    task.args sourceFile.path
                 }
             }
         }
@@ -172,44 +125,24 @@ class CoverityConnectPlugin extends RuleSource {
     /**
      * Create static analysis tasks for Java code
      */
-    private void createJavaCoverityTask(JarBinarySpec binary,
-            CoveritySpec coverity, Exec coverityTask, File intermediates) {
-
-        def covEmitJava = Utils.findCoverityTool('cov-emit-java', coverity.path)
+    private static void createJavaCoverityTask(JarBinarySpec binary, Exec coverityTask, CoverityStream stream) {
+        // Add all input files to the main Coverity task
+        binary.inputs.findAll{ it in JavaSourceSet }.each { sourceSet ->
+            sourceSet.source.files.each { File sourceFile ->
+                coverityTask.args sourceFile.path
+            }
+        }
 
         binary.tasks.withType(JavaCompile) { compileTask ->
             // Create a cov-emit-java task for each compile task
             def taskName = binary.tasks.taskName('coverity')
-            binary.tasks.create(taskName, Exec) { task ->
+            binary.tasks.create(taskName, CoverityEmitJavaTask) { CoverityEmitJavaTask task ->
+                task.stream = stream
+                task.compileTask = compileTask
+
                 task.dependsOn compileTask
                 coverityTask.dependsOn task
-
-                task.executable covEmitJava
-                task.args '--dir', intermediates.path
-                task.args '--compiler-outputs', compileTask.destinationDir.path
-                task.args '--classpath', compileTask.classpath.asPath
-                task.args '--bootclasspath', compileTask.options.bootClasspath
-                task.args '--encoding', compileTask.options.encoding
-                task.args '--source', compileTask.sourceCompatibility
-
-                compileTask.source.files.each { sourceFile ->
-                    // Add this file to the list for the cov-run-desktop task
-                    coverityTask.args sourceFile
-                    task.args sourceFile
-                }
             }
-        }
-    }
-
-    private static void addHostConfig(Exec task, CoveritySpec coverity) {
-        if (coverity.host != null) {
-            task.args '--host', coverity.host
-        } else {
-            throw new IllegalArgumentException('Coverity Connect host was not specified.')
-        }
-
-        if (coverity.port != null) {
-            task.args '--port', coverity.port
         }
     }
 }
