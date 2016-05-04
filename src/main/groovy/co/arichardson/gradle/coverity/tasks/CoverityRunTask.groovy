@@ -32,7 +32,9 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
         super.preExec()
 
         List<String> extraArgs = [
-                '--stream', stream.stream, '--text-output', resultsFile.path
+                '--dir', intermediatesDir.path,
+                '--stream', stream.stream,
+                '--text-output', resultsFile.path
         ]
 
         if (coverity.scm) {

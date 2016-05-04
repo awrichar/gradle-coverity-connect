@@ -1,11 +1,13 @@
 package co.arichardson.gradle.coverity
 
 import org.gradle.api.Task
-import org.gradle.language.c.tasks.CCompile
 import org.gradle.language.cpp.tasks.CppCompile
 import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
 import org.gradle.model.ModelMap
 import org.gradle.nativeplatform.toolchain.Gcc
+import org.gradle.nativeplatform.toolchain.GccCommandLineToolConfiguration
+import org.gradle.nativeplatform.toolchain.GccPlatformToolChain
+import org.gradle.nativeplatform.toolchain.NativePlatformToolChain
 import org.gradle.nativeplatform.toolchain.NativeToolChain
 
 class Utils {
@@ -22,8 +24,9 @@ class Utils {
         return toolName
     }
 
-    public static File findGccTool(NativeToolChain toolChain, String toolName) {
+    public static String findGccTool(NativeToolChain toolChain, String toolName) {
         if (!(toolChain in Gcc)) return null
+        if (toolChain.path.isEmpty()) return toolName
 
         def tools = []
         toolChain.path*.eachFile { tools << it }
@@ -32,16 +35,16 @@ class Utils {
         }
     }
 
-    /**
-     * TODO: Find a way to identify the compilers actually configured by Gradle
-     */
-    public static File findGccCompiler(NativeToolChain toolChain, AbstractNativeCompileTask compileTask) {
-        if (compileTask in CCompile) {
-            return findGccTool(toolChain, 'gcc')
-        } else if (compileTask in CppCompile) {
-            return findGccTool(toolChain, 'g++')
-        }
+    public static GccCommandLineToolConfiguration getPlatformCompiler(NativePlatformToolChain platformToolChain,
+                                                                      AbstractNativeCompileTask compileTask) {
+        if (!(platformToolChain in GccPlatformToolChain)) return null
 
-        return null
+        return (compileTask instanceof CppCompile) ?
+                platformToolChain.cppCompiler : platformToolChain.cCompiler
+    }
+
+    public static List<String> getCompileArgs(AbstractNativeCompileTask compileTask) {
+        File optionsFile = new File(compileTask.temporaryDir, 'options.txt')
+        return optionsFile.readLines()
     }
 }

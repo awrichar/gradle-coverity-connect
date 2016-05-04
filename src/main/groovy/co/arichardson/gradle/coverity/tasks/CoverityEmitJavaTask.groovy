@@ -14,6 +14,7 @@ class CoverityEmitJavaTask extends AbstractCoverityIntermediatesTask {
     @Override
     protected void preExec() {
         super.preExec()
+        args '--dir', intermediatesDir.path
         args '--compiler-outputs', compileTask.destinationDir.path
         args '--classpath', compileTask.classpath.asPath
         args '--bootclasspath', compileTask.options.bootClasspath
