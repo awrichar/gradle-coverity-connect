@@ -45,6 +45,10 @@ class Utils {
 
     public static List<String> getCompileArgs(AbstractNativeCompileTask compileTask) {
         File optionsFile = new File(compileTask.temporaryDir, 'options.txt')
-        return optionsFile.readLines()
+        return unescapeQuotes(optionsFile.readLines())
+    }
+
+    private static List<String> unescapeQuotes(List<String> args) {
+        return args.collect { it.replaceAll(/\\"/, '"') }
     }
 }
