@@ -25,6 +25,7 @@ class Utils {
     }
 
     public static String findGccTool(NativeToolChain toolChain, String toolName) {
+        if (toolName == null) return null
         if (!(toolChain in Gcc)) return null
         if (toolChain.path.isEmpty()) return toolName
 

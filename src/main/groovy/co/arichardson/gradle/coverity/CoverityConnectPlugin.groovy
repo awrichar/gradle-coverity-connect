@@ -149,7 +149,7 @@ class CoverityConnectPlugin extends RuleSource {
                     platformToolchains.get(binary.targetPlatform, binary.toolChain) as GccPlatformToolChain
             GccCommandLineToolConfiguration platformCompiler =
                     Utils.getPlatformCompiler(platformToolChain, compileTask)
-            String compiler = Utils.findGccTool(binary.toolChain, platformCompiler.executable)
+            String compiler = Utils.findGccTool(binary.toolChain, platformCompiler?.executable)
 
             Task configTask
             binary.tasks.create(configTaskName, CoverityConfigureTask) { CoverityConfigureTask task ->
