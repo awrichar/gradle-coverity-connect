@@ -20,6 +20,7 @@ import org.gradle.model.Mutate
 import org.gradle.model.Path
 import org.gradle.model.RuleSource
 import org.gradle.nativeplatform.NativeBinarySpec
+import org.gradle.nativeplatform.toolchain.Gcc
 import org.gradle.nativeplatform.toolchain.GccCommandLineToolConfiguration
 import org.gradle.nativeplatform.toolchain.GccPlatformToolChain
 import org.gradle.nativeplatform.toolchain.NativeToolChain
@@ -143,19 +144,24 @@ class CoverityConnectPlugin extends RuleSource {
         // Create a cov-configure and cov-translate task for each compile task
         binary.tasks.withType(AbstractNativeCompileTask) { AbstractNativeCompileTask compileTask ->
             String translateTaskName = coverityTask.name + compileTask.name.capitalize()
-            String configTaskName = translateTaskName + 'Configure'
+            String configTaskName = 'configure' + translateTaskName.capitalize()
 
+            Gcc toolChain = binary.toolChain as Gcc
             GccPlatformToolChain platformToolChain =
-                    platformToolchains.get(binary.targetPlatform, binary.toolChain) as GccPlatformToolChain
+                    platformToolchains.get(binary.targetPlatform, toolChain) as GccPlatformToolChain
             GccCommandLineToolConfiguration platformCompiler =
                     Utils.getPlatformCompiler(platformToolChain, compileTask)
-            String compiler = Utils.findGccTool(binary.toolChain, platformCompiler?.executable)
+
+            String path = System.env.PATH
+            if (binary.toolChain) {
+                path = [toolChain.path.join(File.pathSeparator), path].join(File.pathSeparator)
+            }
 
             Task configTask
             binary.tasks.create(configTaskName, CoverityConfigureTask) { CoverityConfigureTask task ->
                 task.stream = stream
-                task.compiler = compiler
-                task.compileTask = compileTask
+                task.compiler = platformCompiler?.executable
+                task.compilerType = 'gcc'
 
                 task.dependsOn compileTask
                 configTask = task
@@ -163,8 +169,9 @@ class CoverityConnectPlugin extends RuleSource {
 
             binary.tasks.create(translateTaskName, CoverityTranslateTask) { CoverityTranslateTask task ->
                 task.stream = stream
-                task.compiler = compiler
+                task.compiler = platformCompiler?.executable
                 task.compileTask = compileTask
+                task.environment['PATH'] = path
 
                 task.dependsOn configTask
                 coverityTask.dependsOn task

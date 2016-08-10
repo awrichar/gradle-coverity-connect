@@ -17,7 +17,7 @@ class CoverityTranslateTask extends AbstractCoverityIntermediatesTask {
     protected void preExec() {
         super.preExec()
 
-        args '--config', getConfigFile(compileTask.name).path
+        args '--config', configFile.path
         args '--dir', intermediatesDir.path
         args compiler
         args Utils.getCompileArgs(compileTask)

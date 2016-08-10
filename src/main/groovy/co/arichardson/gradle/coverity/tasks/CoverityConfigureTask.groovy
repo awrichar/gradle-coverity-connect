@@ -1,11 +1,10 @@
 package co.arichardson.gradle.coverity.tasks
 
 import co.arichardson.gradle.coverity.Utils
-import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
 
 class CoverityConfigureTask extends AbstractCoverityIntermediatesTask {
     String compiler
-    AbstractNativeCompileTask compileTask
+    String compilerType
 
     CoverityConfigureTask() {
         super()
@@ -16,8 +15,11 @@ class CoverityConfigureTask extends AbstractCoverityIntermediatesTask {
     protected void preExec() {
         super.preExec()
 
-        args '--config', getConfigFile(compileTask.name).path
+        args '--config', configFile.path
+        if (compilerType) {
+            args '--comptype', compilerType
+        }
+        args '--template'
         args '--compiler', compiler, '--'
-        args Utils.getCompileArgs(compileTask)
     }
 }

@@ -26,8 +26,8 @@ abstract class AbstractCoverityIntermediatesTask extends AbstractCoverityTask {
         return new File(mainConfig, stream.name)
     }
 
-    public File getConfigFile(String id) {
-        return new File(configDir, "${id}_config.xml")
+    public File getConfigFile() {
+        return new File(configDir, "config.xml")
     }
 
     public File getIntermediatesDir() {

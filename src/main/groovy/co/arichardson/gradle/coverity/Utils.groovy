@@ -4,11 +4,9 @@ import org.gradle.api.Task
 import org.gradle.language.cpp.tasks.CppCompile
 import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
 import org.gradle.model.ModelMap
-import org.gradle.nativeplatform.toolchain.Gcc
 import org.gradle.nativeplatform.toolchain.GccCommandLineToolConfiguration
 import org.gradle.nativeplatform.toolchain.GccPlatformToolChain
 import org.gradle.nativeplatform.toolchain.NativePlatformToolChain
-import org.gradle.nativeplatform.toolchain.NativeToolChain
 
 class Utils {
     public static Task addTask(ModelMap<Task> tasks, String name, Class<? extends Task> type) {
@@ -22,18 +20,6 @@ class Utils {
         }
 
         return toolName
-    }
-
-    public static String findGccTool(NativeToolChain toolChain, String toolName) {
-        if (toolName == null) return null
-        if (!(toolChain in Gcc)) return null
-        if (toolChain.path.isEmpty()) return toolName
-
-        def tools = []
-        toolChain.path*.eachFile { tools << it }
-        return tools.find {
-            it.name == toolName || it.name.endsWith("-${toolName}")
-        }
     }
 
     public static GccCommandLineToolConfiguration getPlatformCompiler(NativePlatformToolChain platformToolChain,
