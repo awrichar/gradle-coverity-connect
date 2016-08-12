@@ -6,6 +6,9 @@ import org.gradle.model.Unmanaged
 
 @Managed
 interface CoverityStream extends Named {
+    boolean getEnabled()
+    void setEnabled(boolean enabled)
+
     String getStream()
     void setStream(String stream)
 

@@ -54,6 +54,7 @@ class CoverityConnectPlugin extends RuleSource {
         coverity.port = '8080'
         coverity.authKeyFile = new File(System.getProperty('user.home'), COVERITY_KEY_FILE)
         coverity.streams.beforeEach {
+            it.enabled = true
             it.filter = { true }
         }
     }
@@ -99,6 +100,8 @@ class CoverityConnectPlugin extends RuleSource {
 
         // Create one "run" task per stream
         coverity.streams.each { CoverityStream stream ->
+            if (!stream.enabled) return
+
             // Ensure there are some sources matching this stream
             List<BinarySpec> matchedBinaries = binaries.findAll(stream.filter)
             boolean hasSources = matchedBinaries.find { BinarySpec binary ->
