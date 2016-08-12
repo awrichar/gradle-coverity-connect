@@ -1,7 +1,6 @@
 package co.arichardson.gradle.coverity
 
 import co.arichardson.gradle.coverity.tasks.CoverityAuthTask
-
 import co.arichardson.gradle.coverity.tasks.CoverityConfigureTask
 import co.arichardson.gradle.coverity.tasks.CoverityEmitJavaTask
 import co.arichardson.gradle.coverity.tasks.CoverityRunTask
@@ -13,7 +12,7 @@ import org.gradle.jvm.JarBinarySpec
 import org.gradle.language.base.LanguageSourceSet
 import org.gradle.language.c.tasks.CCompile
 import org.gradle.language.cpp.tasks.CppCompile
-import org.gradle.language.java.JavaSourceSet
+import org.gradle.language.jvm.JvmResourceSet
 import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
 import org.gradle.model.Defaults
 import org.gradle.model.Finalize
@@ -102,22 +101,13 @@ class CoverityConnectPlugin extends RuleSource {
         coverity.streams.each { CoverityStream stream ->
             if (!stream.enabled) return
 
-            // Ensure there are some sources matching this stream
             List<BinarySpec> matchedBinaries = binaries.findAll(stream.filter)
-            boolean hasSources = matchedBinaries.find { BinarySpec binary ->
-                binary.inputs.find { LanguageSourceSet sourceSet ->
-                    sourceSet.source.files.size() > 0
-                }
-            }
-            if (!hasSources) return
 
+            // Configure the run and clean tasks
             String taskName = "coverity${stream.name.capitalize()}"
             String cleanTaskName = "clean${taskName}"
             CoverityRunTask runTask = Utils.addTask(tasks, taskName, CoverityRunTask) as CoverityRunTask
             Delete cleanTask = Utils.addTask(tasks, cleanTaskName, Delete) as Delete
-
-            mainTask.dependsOn runTask
-            mainCleanTask.dependsOn cleanTask
 
             runTask.stream = stream
             cleanTask.delete runTask.configDir
@@ -125,13 +115,25 @@ class CoverityConnectPlugin extends RuleSource {
             cleanTask.delete runTask.resultsFile
 
             // Create sub-tasks for each binary on this stream
+            boolean hasSources = false
             matchedBinaries.each { BinarySpec binary ->
-                if (binary in NativeBinarySpec) {
-                    createNativeCoverityTask(binary, runTask, stream)
-                } else if (binary in JarBinarySpec) {
-                    createJavaCoverityTask(binary, runTask, stream)
+                Set<LanguageSourceSet> sourceSets = binary.inputs.findAll { !(it in JvmResourceSet) }
+                List<File> sources = sourceSets*.source*.files.flatten() as List<File>
+
+                if (!sources.isEmpty()) {
+                    hasSources = true
+                    runTask.sourceFiles.addAll(sources)
+
+                    if (binary in NativeBinarySpec) {
+                        createNativeCoverityTask(binary, runTask, stream)
+                    } else if (binary in JarBinarySpec) {
+                        createJavaCoverityTask(binary, runTask, stream)
+                    }
                 }
             }
+
+            if (hasSources) mainTask.dependsOn runTask
+            mainCleanTask.dependsOn cleanTask
         }
     }
 
@@ -165,25 +167,19 @@ class CoverityConnectPlugin extends RuleSource {
                                                  CoverityRunTask coverityTask,
                                                  CoverityStream stream) {
 
-        // Add all input files to the main Coverity task
-        binary.inputs.each { LanguageSourceSet sourceSet ->
-            sourceSet.source.files.each { File sourceFile ->
-                coverityTask.sourceFiles << sourceFile
-            }
-        }
-
         // Create a cov-translate task for each compile task
         binary.tasks.withType(AbstractNativeCompileTask) { AbstractNativeCompileTask compileTask ->
             if (!(binary.toolChain in GccToolChain)) return
             GccToolChain toolChain = binary.toolChain as GccToolChain
 
             String compiler
-            if (compileTask in CCompile)
+            if (compileTask in CCompile) {
                 compiler = platformToolchains.getCCompiler(binary.targetPlatform, toolChain)
-            else if (compileTask in CppCompile)
+            } else if (compileTask in CppCompile) {
                 compiler = platformToolchains.getCppCompiler(binary.targetPlatform, toolChain)
-            else
+            } else {
                 return
+            }
 
             String configTaskName = getConfigTaskName(toolChain, binary.targetPlatform)
             String translateTaskName = coverityTask.name + compileTask.name.capitalize()
@@ -211,13 +207,6 @@ class CoverityConnectPlugin extends RuleSource {
     private static void createJavaCoverityTask(JarBinarySpec binary,
                                                CoverityRunTask coverityTask,
                                                CoverityStream stream) {
-
-        // Add all input files to the main Coverity task
-        binary.inputs.findAll{ it in JavaSourceSet }.each { JavaSourceSet sourceSet ->
-            sourceSet.source.files.each { File sourceFile ->
-                coverityTask.sourceFiles << sourceFile
-            }
-        }
 
         // Create a cov-emit-java task for each compile task
         binary.tasks.withType(JavaCompile) { compileTask ->
