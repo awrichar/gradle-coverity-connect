@@ -1,12 +1,8 @@
 package co.arichardson.gradle.coverity
 
 import org.gradle.api.Task
-import org.gradle.language.cpp.tasks.CppCompile
 import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
 import org.gradle.model.ModelMap
-import org.gradle.nativeplatform.toolchain.GccCommandLineToolConfiguration
-import org.gradle.nativeplatform.toolchain.GccPlatformToolChain
-import org.gradle.nativeplatform.toolchain.NativePlatformToolChain
 
 class Utils {
     public static Task addTask(ModelMap<Task> tasks, String name, Class<? extends Task> type) {
@@ -20,14 +16,6 @@ class Utils {
         }
 
         return toolName
-    }
-
-    public static GccCommandLineToolConfiguration getPlatformCompiler(NativePlatformToolChain platformToolChain,
-                                                                      AbstractNativeCompileTask compileTask) {
-        if (!(platformToolChain in GccPlatformToolChain)) return null
-
-        return (compileTask instanceof CppCompile) ?
-                platformToolChain.cppCompiler : platformToolChain.cCompiler
     }
 
     public static List<String> getCompileArgs(AbstractNativeCompileTask compileTask) {

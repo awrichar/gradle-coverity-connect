@@ -2,7 +2,7 @@ package co.arichardson.gradle.coverity.tasks
 
 import co.arichardson.gradle.coverity.Utils
 
-class CoverityConfigureTask extends AbstractCoverityIntermediatesTask {
+class CoverityConfigureTask extends AbstractCoverityTask {
     String compiler
     String compilerType
 

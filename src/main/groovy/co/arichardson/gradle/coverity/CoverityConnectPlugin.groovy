@@ -1,6 +1,7 @@
 package co.arichardson.gradle.coverity
 
 import co.arichardson.gradle.coverity.tasks.CoverityAuthTask
+
 import co.arichardson.gradle.coverity.tasks.CoverityConfigureTask
 import co.arichardson.gradle.coverity.tasks.CoverityEmitJavaTask
 import co.arichardson.gradle.coverity.tasks.CoverityRunTask
@@ -10,6 +11,8 @@ import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.JarBinarySpec
 import org.gradle.language.base.LanguageSourceSet
+import org.gradle.language.c.tasks.CCompile
+import org.gradle.language.cpp.tasks.CppCompile
 import org.gradle.language.java.JavaSourceSet
 import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
 import org.gradle.model.Defaults
@@ -20,12 +23,12 @@ import org.gradle.model.Mutate
 import org.gradle.model.Path
 import org.gradle.model.RuleSource
 import org.gradle.nativeplatform.NativeBinarySpec
-import org.gradle.nativeplatform.toolchain.Gcc
-import org.gradle.nativeplatform.toolchain.GccCommandLineToolConfiguration
+import org.gradle.nativeplatform.platform.NativePlatform
 import org.gradle.nativeplatform.toolchain.GccPlatformToolChain
 import org.gradle.nativeplatform.toolchain.NativeToolChain
 import org.gradle.nativeplatform.toolchain.NativeToolChainRegistry
 import org.gradle.nativeplatform.toolchain.internal.gcc.AbstractGccCompatibleToolChain
+import org.gradle.nativeplatform.toolchain.internal.gcc.GccToolChain
 import org.gradle.platform.base.BinarySpec
 
 class CoverityConnectPlugin extends RuleSource {
@@ -56,17 +59,19 @@ class CoverityConnectPlugin extends RuleSource {
     }
 
     /**
-     * Save a map of NativePlatformToolChain objects for later use
+     * Save a map of compiler names for later use
      * TODO: This seems hacky; is there a better way?
      */
     @Finalize
     void mapToolChains(NativeToolChainRegistry toolChains) {
         toolChains.each { NativeToolChain toolChain ->
-            if (!(toolChain in AbstractGccCompatibleToolChain))
-                return
+            if (!(toolChain in AbstractGccCompatibleToolChain)) return
 
             toolChain.eachPlatform { GccPlatformToolChain platformToolChain ->
-                platformToolchains.put(platformToolChain.platform, toolChain, platformToolChain)
+                platformToolchains.setCCompiler(platformToolChain.platform, toolChain,
+                        platformToolChain.cCompiler.executable)
+                platformToolchains.setCppCompiler(platformToolChain.platform, toolChain,
+                        platformToolChain.cppCompiler.executable)
             }
         }
     }
@@ -128,6 +133,29 @@ class CoverityConnectPlugin extends RuleSource {
     }
 
     /**
+     * Generate a unique name for a cov-configure task
+     */
+    private static String getConfigTaskName(NativeToolChain toolChain, NativePlatform platform) {
+        'configureCoverity' + toolChain.name.capitalize() + platform.name.capitalize()
+    }
+
+    /**
+     * Create a cov-configure task for each GCC toolchain
+     */
+    @Finalize
+    void createConfigureTasks(ModelMap<Task> tasks, NativeToolChainRegistry toolChains) {
+        platformToolchains.cCompilers.each { PlatformToolchainMap.PlatformId platformId,
+                                             String cCompiler ->
+
+            String configTaskName = getConfigTaskName(platformId.toolChain, platformId.platform)
+            tasks.create(configTaskName, CoverityConfigureTask) { CoverityConfigureTask task ->
+                task.compiler = cCompiler
+                task.compilerType = 'gcc'
+            }
+        }
+    }
+
+    /**
      * Create static analysis tasks for native code
      */
     private static void createNativeCoverityTask(NativeBinarySpec binary,
@@ -141,39 +169,34 @@ class CoverityConnectPlugin extends RuleSource {
             }
         }
 
-        // Create a cov-configure and cov-translate task for each compile task
+        // Create a cov-translate task for each compile task
         binary.tasks.withType(AbstractNativeCompileTask) { AbstractNativeCompileTask compileTask ->
-            String translateTaskName = coverityTask.name + compileTask.name.capitalize()
-            String configTaskName = 'configure' + translateTaskName.capitalize()
+            if (!(binary.toolChain in GccToolChain)) return
+            GccToolChain toolChain = binary.toolChain as GccToolChain
 
-            Gcc toolChain = binary.toolChain as Gcc
-            GccPlatformToolChain platformToolChain =
-                    platformToolchains.get(binary.targetPlatform, toolChain) as GccPlatformToolChain
-            GccCommandLineToolConfiguration platformCompiler =
-                    Utils.getPlatformCompiler(platformToolChain, compileTask)
+            String compiler
+            if (compileTask in CCompile)
+                compiler = platformToolchains.getCCompiler(binary.targetPlatform, toolChain)
+            else if (compileTask in CppCompile)
+                compiler = platformToolchains.getCppCompiler(binary.targetPlatform, toolChain)
+            else
+                return
+
+            String configTaskName = getConfigTaskName(toolChain, binary.targetPlatform)
+            String translateTaskName = coverityTask.name + compileTask.name.capitalize()
 
             String path = System.env.PATH
-            if (binary.toolChain) {
+            if (toolChain && toolChain.path) {
                 path = [toolChain.path.join(File.pathSeparator), path].join(File.pathSeparator)
-            }
-
-            Task configTask
-            binary.tasks.create(configTaskName, CoverityConfigureTask) { CoverityConfigureTask task ->
-                task.stream = stream
-                task.compiler = platformCompiler?.executable
-                task.compilerType = 'gcc'
-
-                task.dependsOn compileTask
-                configTask = task
             }
 
             binary.tasks.create(translateTaskName, CoverityTranslateTask) { CoverityTranslateTask task ->
                 task.stream = stream
-                task.compiler = platformCompiler?.executable
+                task.compiler = compiler
                 task.compileTask = compileTask
                 task.environment['PATH'] = path
 
-                task.dependsOn configTask
+                task.dependsOn configTaskName, compileTask
                 coverityTask.dependsOn task
             }
         }

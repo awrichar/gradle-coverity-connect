@@ -4,6 +4,9 @@ import co.arichardson.gradle.coverity.CoveritySpec
 import org.gradle.api.tasks.Exec
 
 abstract class AbstractCoverityTask extends Exec {
+    public static final String CONFIG_DIR = 'coverity-config'
+    public static final String CONFIG_FILE = 'config.xml'
+
     CoveritySpec coverity
 
     public AbstractCoverityTask() {
@@ -30,6 +33,14 @@ abstract class AbstractCoverityTask extends Exec {
     }
 
     protected void preExec() {
-        // do nothing (can be overriden)
+        configDir.mkdirs()
+    }
+
+    public File getConfigDir() {
+        return new File(project.buildDir, CONFIG_DIR)
+    }
+
+    public File getConfigFile() {
+        return new File(configDir, CONFIG_FILE)
     }
 }

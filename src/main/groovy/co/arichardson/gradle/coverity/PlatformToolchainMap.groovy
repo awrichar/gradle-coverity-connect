@@ -1,10 +1,12 @@
 package co.arichardson.gradle.coverity
 
 import org.gradle.nativeplatform.platform.NativePlatform
-import org.gradle.nativeplatform.toolchain.NativePlatformToolChain
 import org.gradle.nativeplatform.toolchain.NativeToolChain
 
-class PlatformToolchainMap extends HashMap<PlatformId, NativePlatformToolChain> {
+class PlatformToolchainMap {
+    Map<PlatformId, String> cCompilers = [:]
+    Map<PlatformId, String> cppCompilers = [:]
+
     public static class PlatformId {
         NativePlatform platform
         NativeToolChain toolChain
@@ -34,11 +36,19 @@ class PlatformToolchainMap extends HashMap<PlatformId, NativePlatformToolChain> 
         }
     }
 
-    NativePlatformToolChain get(NativePlatform platform, NativeToolChain toolChain) {
-        get(new PlatformId(platform, toolChain))
+    String getCCompiler(NativePlatform platform, NativeToolChain toolChain) {
+        cCompilers.get(new PlatformId(platform, toolChain))
     }
 
-    NativePlatformToolChain put(NativePlatform platform, NativeToolChain toolChain, NativePlatformToolChain value) {
-        put(new PlatformId(platform, toolChain), value)
+    String setCCompiler(NativePlatform platform, NativeToolChain toolChain, String executable) {
+        cCompilers.put(new PlatformId(platform, toolChain), executable)
+    }
+
+    String getCppCompiler(NativePlatform platform, NativeToolChain toolChain) {
+        cppCompilers.get(new PlatformId(platform, toolChain))
+    }
+
+    String setCppCompiler(NativePlatform platform, NativeToolChain toolChain, String executable) {
+        cppCompilers.put(new PlatformId(platform, toolChain), executable)
     }
 }
