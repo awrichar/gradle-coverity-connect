@@ -31,6 +31,7 @@ import org.gradle.nativeplatform.toolchain.internal.gcc.GccToolChain
 import org.gradle.platform.base.BinarySpec
 
 class CoverityConnectPlugin extends RuleSource {
+    public static final String COVERITY_TASK_GROUP = "Coverity static analysis tasks"
     public static final String COVERITY_KEY_FILE = '.coverity_key'
     private static final PlatformToolchainMap platformToolchains = [:]
 
@@ -81,7 +82,10 @@ class CoverityConnectPlugin extends RuleSource {
      */
     @Mutate
     void createCoverityAuthTask(ModelMap<Task> tasks) {
-        tasks.create('coverity-auth', CoverityAuthTask)
+        tasks.create('coverity-auth', CoverityAuthTask) { task ->
+            task.group = COVERITY_TASK_GROUP
+            task.description = 'Generates a Coverity authentication key file.'
+        }
     }
 
     /**
@@ -97,6 +101,11 @@ class CoverityConnectPlugin extends RuleSource {
         Task mainTask = Utils.addTask(tasks, 'coverity', Task)
         Task mainCleanTask = Utils.addTask(tasks, 'cleanCoverity', Task)
 
+        mainTask.group = COVERITY_TASK_GROUP
+        mainTask.description = "Runs Coverity static analysis."
+
+        mainCleanTask.group = COVERITY_TASK_GROUP
+
         // Create one "run" task per stream
         coverity.streams.each { CoverityStream stream ->
             if (!stream.enabled) return
@@ -104,12 +113,22 @@ class CoverityConnectPlugin extends RuleSource {
             List<BinarySpec> matchedBinaries = binaries.findAll(stream.filter)
 
             // Configure the run and clean tasks
-            String taskName = "coverity${stream.name.capitalize()}"
-            String cleanTaskName = "clean${taskName}"
-            CoverityRunTask runTask = Utils.addTask(tasks, taskName, CoverityRunTask) as CoverityRunTask
+            String runTaskName = "coverityRun${stream.name.capitalize()}"
+            String emitTaskName = "coverityEmit${stream.name.capitalize()}"
+            String cleanTaskName = "cleanCoverity${stream.name.capitalize()}"
+            CoverityRunTask runTask = Utils.addTask(tasks, runTaskName, CoverityRunTask) as CoverityRunTask
+            Task emitTask = Utils.addTask(tasks, emitTaskName, Task)
             Delete cleanTask = Utils.addTask(tasks, cleanTaskName, Delete) as Delete
 
+            runTask.group = COVERITY_TASK_GROUP
+            runTask.description = "Runs Coverity static analysis for stream '${stream.name}'."
             runTask.stream = stream
+            runTask.dependsOn emitTask
+
+            emitTask.group = COVERITY_TASK_GROUP
+            emitTask.description = "Emits Coverity intermediate data for stream '${stream.name}'."
+
+            cleanTask.group = COVERITY_TASK_GROUP
             cleanTask.delete runTask.configDir
             cleanTask.delete runTask.intermediatesDir
             cleanTask.delete runTask.resultsFile
@@ -125,9 +144,9 @@ class CoverityConnectPlugin extends RuleSource {
                     runTask.sourceFiles.addAll(sources)
 
                     if (binary in NativeBinarySpec) {
-                        createNativeCoverityTask(binary, runTask, stream)
+                        createNativeCoverityTask(binary, emitTask, stream)
                     } else if (binary in JarBinarySpec) {
-                        createJavaCoverityTask(binary, runTask, stream)
+                        createJavaCoverityTask(binary, emitTask, stream)
                     }
                 }
             }
@@ -154,6 +173,7 @@ class CoverityConnectPlugin extends RuleSource {
 
             String configTaskName = getConfigTaskName(platformId.toolChain, platformId.platform)
             tasks.create(configTaskName, CoverityConfigureTask) { CoverityConfigureTask task ->
+                task.group = COVERITY_TASK_GROUP
                 task.compiler = cCompiler
                 task.compilerType = 'gcc'
             }
@@ -164,7 +184,7 @@ class CoverityConnectPlugin extends RuleSource {
      * Create static analysis tasks for native code
      */
     private static void createNativeCoverityTask(NativeBinarySpec binary,
-                                                 CoverityRunTask coverityTask,
+                                                 Task coverityTask,
                                                  CoverityStream stream) {
 
         // Create a cov-translate task for each compile task
@@ -205,7 +225,7 @@ class CoverityConnectPlugin extends RuleSource {
      * Create static analysis tasks for Java code
      */
     private static void createJavaCoverityTask(JarBinarySpec binary,
-                                               CoverityRunTask coverityTask,
+                                               Task coverityTask,
                                                CoverityStream stream) {
 
         // Create a cov-emit-java task for each compile task
