@@ -26,6 +26,9 @@ interface CoveritySpec {
     boolean getAnalyzeScmModified()
     void setAnalyzeScmModified(boolean analyzeScmModified)
 
+    File getIntermediatesDir()
+    void setIntermediatesDir(File dir)
+
     List<String> getArgs()
 
     ModelMap<CoverityStream> getStreams()

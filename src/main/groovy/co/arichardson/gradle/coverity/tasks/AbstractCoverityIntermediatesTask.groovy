@@ -20,7 +20,12 @@ abstract class AbstractCoverityIntermediatesTask extends AbstractCoverityTask {
     }
 
     public File getIntermediatesDir() {
-        File mainIntermediates = new File(project.buildDir, INTERMEDIATES_DIR)
+        File mainIntermediates
+        if (coverity.intermediatesDir) {
+            mainIntermediates = coverity.intermediatesDir
+        } else {
+            mainIntermediates = new File(project.buildDir, INTERMEDIATES_DIR)
+        }
         return new File(mainIntermediates, stream.name)
     }
 }

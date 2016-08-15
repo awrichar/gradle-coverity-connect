@@ -38,4 +38,5 @@ The following properties can be set on the `coverity` block:
 * **enabled:** whether to run Coverity for this project (default: true)
 * **scm:** type of SCM in use (git, svn, etc)
 * **analyzeScmModified:** if true, analyze only files modified according to the SCM
+* **intermediatesDir:** base directory to store Coverity intermediates
 
