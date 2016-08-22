@@ -98,13 +98,7 @@ class CoverityConnectPlugin extends RuleSource {
 
         if (!coverity.enabled) return
 
-        Task mainTask = Utils.addTask(tasks, 'coverity', Task)
-        Task mainCleanTask = Utils.addTask(tasks, 'cleanCoverity', Task)
-
-        mainTask.group = COVERITY_TASK_GROUP
-        mainTask.description = "Runs Coverity static analysis."
-
-        mainCleanTask.group = COVERITY_TASK_GROUP
+        List<String> runTasks = []
 
         // Create one "run" task per stream
         coverity.streams.each { CoverityStream stream ->
@@ -112,47 +106,54 @@ class CoverityConnectPlugin extends RuleSource {
 
             List<BinarySpec> matchedBinaries = binaries.findAll(stream.filter)
 
-            // Configure the run and clean tasks
             String runTaskName = "coverityRun${stream.name.capitalize()}"
             String emitTaskName = "coverityEmit${stream.name.capitalize()}"
-            String cleanTaskName = "cleanCoverity${stream.name.capitalize()}"
-            CoverityRunTask runTask = Utils.addTask(tasks, runTaskName, CoverityRunTask) as CoverityRunTask
-            Task emitTask = Utils.addTask(tasks, emitTaskName, Task)
-            Delete cleanTask = Utils.addTask(tasks, cleanTaskName, Delete) as Delete
+            runTasks << runTaskName
 
-            runTask.group = COVERITY_TASK_GROUP
-            runTask.description = "Runs Coverity static analysis for stream '${stream.name}'."
-            runTask.stream = stream
-            runTask.dependsOn emitTask
+            List<File> allSources = []
+            List<String> emitTasks = []
 
-            emitTask.group = COVERITY_TASK_GROUP
-            emitTask.description = "Emits Coverity intermediate data for stream '${stream.name}'."
-
-            cleanTask.group = COVERITY_TASK_GROUP
-            cleanTask.delete runTask.configDir
-            cleanTask.delete runTask.intermediatesDir
-            cleanTask.delete runTask.resultsFile
-
-            // Create sub-tasks for each binary on this stream
-            boolean hasSources = false
+            // Create emit tasks for each binary on this stream
             matchedBinaries.each { BinarySpec binary ->
                 Set<LanguageSourceSet> sourceSets = binary.inputs.findAll { !(it in JvmResourceSet) }
                 List<File> sources = sourceSets*.source*.files.flatten() as List<File>
 
                 if (!sources.isEmpty()) {
-                    hasSources = true
-                    runTask.sourceFiles.addAll(sources)
+                    allSources.addAll(sources)
 
                     if (binary in NativeBinarySpec) {
-                        createNativeCoverityTask(binary, emitTask, stream)
+                        emitTasks.addAll(createNativeCoverityTasks(binary, stream))
                     } else if (binary in JarBinarySpec) {
-                        createJavaCoverityTask(binary, emitTask, stream)
+                        emitTasks.addAll(createJavaCoverityTasks(binary, stream))
                     }
                 }
             }
 
-            if (hasSources) mainTask.dependsOn runTask
-            mainCleanTask.dependsOn cleanTask
+            // Create the emit and run tasks
+            tasks.create(emitTaskName) { Task task ->
+                task.group = COVERITY_TASK_GROUP
+                task.description = "Emits Coverity intermediate data for stream '${stream.name}'."
+                task.dependsOn emitTasks
+            }
+
+            tasks.create(runTaskName, CoverityRunTask) { CoverityRunTask task ->
+                task.group = COVERITY_TASK_GROUP
+                task.description = "Runs Coverity static analysis for stream '${stream.name}'."
+                task.stream = stream
+                task.dependsOn emitTaskName
+
+                if (allSources.isEmpty()) {
+                    task.enabled = false
+                } else {
+                    task.sourceFiles.addAll(allSources)
+                }
+            }
+        }
+
+        tasks.create('coverity') { Task task ->
+            task.group = COVERITY_TASK_GROUP
+            task.description = "Runs Coverity static analysis."
+            task.dependsOn runTasks
         }
     }
 
@@ -183,13 +184,14 @@ class CoverityConnectPlugin extends RuleSource {
     /**
      * Create static analysis tasks for native code
      */
-    private static void createNativeCoverityTask(NativeBinarySpec binary,
-                                                 Task coverityTask,
-                                                 CoverityStream stream) {
+    private static List<String> createNativeCoverityTasks(NativeBinarySpec binary, CoverityStream stream) {
+        List<String> taskNames = []
 
         // Create a cov-translate task for each compile task
-        binary.tasks.withType(AbstractNativeCompileTask) { AbstractNativeCompileTask compileTask ->
+        binary.tasks.findAll{ it in AbstractNativeCompileTask }.each { Task task ->
             if (!(binary.toolChain in GccToolChain)) return
+
+            AbstractNativeCompileTask compileTask = task as AbstractNativeCompileTask
             GccToolChain toolChain = binary.toolChain as GccToolChain
 
             String compiler
@@ -202,42 +204,47 @@ class CoverityConnectPlugin extends RuleSource {
             }
 
             String configTaskName = getConfigTaskName(toolChain, binary.targetPlatform)
-            String translateTaskName = coverityTask.name + compileTask.name.capitalize()
+            String translateTaskName = 'coverityTranslate' +
+                    stream.name.capitalize() + compileTask.name.capitalize()
+            taskNames << translateTaskName
 
             String path = System.env.PATH
             if (toolChain && toolChain.path) {
                 path = [toolChain.path.join(File.pathSeparator), path].join(File.pathSeparator)
             }
 
-            binary.tasks.create(translateTaskName, CoverityTranslateTask) { CoverityTranslateTask task ->
-                task.stream = stream
-                task.compiler = compiler
-                task.compileTask = compileTask
-                task.environment['PATH'] = path
-
-                task.dependsOn configTaskName, compileTask
-                coverityTask.dependsOn task
+            binary.tasks.create(translateTaskName, CoverityTranslateTask) { CoverityTranslateTask translateTask ->
+                translateTask.stream = stream
+                translateTask.compiler = compiler
+                translateTask.compileTask = compileTask
+                translateTask.environment['PATH'] = path
+                translateTask.dependsOn configTaskName, compileTask
             }
         }
+
+        return taskNames
     }
 
     /**
      * Create static analysis tasks for Java code
      */
-    private static void createJavaCoverityTask(JarBinarySpec binary,
-                                               Task coverityTask,
-                                               CoverityStream stream) {
+    private static List<String> createJavaCoverityTasks(JarBinarySpec binary, CoverityStream stream) {
+        List<String> taskNames = []
 
         // Create a cov-emit-java task for each compile task
-        binary.tasks.withType(JavaCompile) { compileTask ->
-            def taskName = coverityTask.name + compileTask.name.capitalize()
-            binary.tasks.create(taskName, CoverityEmitJavaTask) { CoverityEmitJavaTask task ->
-                task.stream = stream
-                task.compileTask = compileTask
+        binary.tasks.findAll{ it in JavaCompile }.each { Task task ->
+            JavaCompile compileTask = task as JavaCompile
+            String taskName = 'coverityEmitJava' +
+                    stream.name.capitalize() + compileTask.name.capitalize()
+            taskNames << taskName
 
-                task.dependsOn compileTask
-                coverityTask.dependsOn task
+            binary.tasks.create(taskName, CoverityEmitJavaTask) { CoverityEmitJavaTask emitJavaTask ->
+                emitJavaTask.stream = stream
+                emitJavaTask.compileTask = compileTask
+                emitJavaTask.dependsOn compileTask
             }
         }
+
+        return taskNames
     }
 }
