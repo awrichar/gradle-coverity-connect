@@ -3,6 +3,8 @@ package co.arichardson.gradle.coverity.tasks
 import co.arichardson.gradle.coverity.Utils
 import org.gradle.api.GradleException
 
+import java.util.regex.Pattern
+
 class CoverityRunTask extends AbstractCoverityIntermediatesTask {
     private static final int COVERITY_AUTH_KEY_NOT_FOUND = 4
 
@@ -48,7 +50,7 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
         if (coverity.analyzeScmModified) {
             extraArgs << '--analyze-scm-modified'
             extraArgs << '--restrict-modified-file-regex'
-            extraArgs << sourceFiles.join('|')
+            extraArgs << sourceFiles.collect{ Pattern.quote(it.path) }.join('|')
         } else {
             args += sourceFiles
         }
