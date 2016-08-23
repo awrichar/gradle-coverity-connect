@@ -1,8 +1,6 @@
 package co.arichardson.gradle.coverity
 
-import org.gradle.api.Task
 import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
-import org.gradle.model.ModelMap
 
 class Utils {
     public static String findCoverityTool(String toolName, File coverityPath) {

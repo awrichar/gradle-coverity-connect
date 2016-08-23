@@ -6,7 +6,6 @@ import co.arichardson.gradle.coverity.tasks.CoverityEmitJavaTask
 import co.arichardson.gradle.coverity.tasks.CoverityRunTask
 import co.arichardson.gradle.coverity.tasks.CoverityTranslateTask
 import org.gradle.api.Task
-import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.JarBinarySpec
 import org.gradle.language.base.LanguageSourceSet
@@ -180,10 +179,9 @@ class CoverityConnectPlugin extends RuleSource {
     /**
      * Create static analysis tasks for native code
      */
-    private static List<String> createNativeCoverityTasks(NativeBinarySpec binary,
-                                                          Task coverityTask,
-                                                          CoverityStream stream) {
-        List<String> taskNames = []
+    private static void createNativeCoverityTasks(NativeBinarySpec binary,
+                                                  Task coverityTask,
+                                                  CoverityStream stream) {
 
         // Create a cov-translate task for each compile task
         binary.tasks.withType(AbstractNativeCompileTask) { AbstractNativeCompileTask compileTask ->
@@ -206,7 +204,6 @@ class CoverityConnectPlugin extends RuleSource {
             String configTaskName = getConfigTaskName(toolChain, binary.targetPlatform)
             String translateTaskName = 'coverityTranslate' +
                     stream.name.capitalize() + compileTask.name.capitalize()
-            taskNames << translateTaskName
 
             String path = System.env.PATH
             if (toolChain && toolChain.path) {
@@ -222,17 +219,14 @@ class CoverityConnectPlugin extends RuleSource {
                 coverityTask.dependsOn translateTask
             }
         }
-
-        return taskNames
     }
 
     /**
      * Create static analysis tasks for Java code
      */
-    private static List<String> createJavaCoverityTasks(JarBinarySpec binary,
-                                                        Task coverityTask,
-                                                        CoverityStream stream) {
-        List<String> taskNames = []
+    private static void createJavaCoverityTasks(JarBinarySpec binary,
+                                                Task coverityTask,
+                                                CoverityStream stream) {
 
         // Create a cov-emit-java task for each compile task
         binary.tasks.withType(JavaCompile) { JavaCompile compileTask ->
@@ -242,7 +236,6 @@ class CoverityConnectPlugin extends RuleSource {
 
             String taskName = 'coverityEmitJava' +
                     stream.name.capitalize() + compileTask.name.capitalize()
-            taskNames << taskName
 
             binary.tasks.create(taskName, CoverityEmitJavaTask) { CoverityEmitJavaTask emitJavaTask ->
                 emitJavaTask.stream = stream
@@ -251,7 +244,5 @@ class CoverityConnectPlugin extends RuleSource {
                 coverityTask.dependsOn emitJavaTask
             }
         }
-
-        return taskNames
     }
 }
