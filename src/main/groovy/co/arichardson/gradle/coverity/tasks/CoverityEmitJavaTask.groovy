@@ -29,7 +29,7 @@ class CoverityEmitJavaTask extends AbstractCoverityIntermediatesTask {
         sourceFiles.each { args it.path }
     }
 
-    public List<File> getSourceFiles() {
+    public Set<File> getSourceFiles() {
         compileTask.source.files
     }
 }

@@ -38,7 +38,7 @@ class CoverityTranslateTask extends AbstractCoverityIntermediatesTask {
         }
     }
 
-    public List<File> getSourceFiles() {
+    public Set<File> getSourceFiles() {
         compileTask.source.files
     }
 }
