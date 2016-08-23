@@ -26,6 +26,10 @@ class CoverityEmitJavaTask extends AbstractCoverityIntermediatesTask {
             args '--encoding', compileTask.options.encoding
         }
 
-        compileTask.source.files.each { args it.path }
+        sourceFiles.each { args it.path }
+    }
+
+    public List<File> getSourceFiles() {
+        compileTask.source.files
     }
 }

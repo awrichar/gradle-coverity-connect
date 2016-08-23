@@ -28,7 +28,7 @@ class CoverityTranslateTask extends AbstractCoverityIntermediatesTask {
         preExec()
 
         // Perform one exec per source file
-        compileTask.source.files.each { File sourceFile ->
+        sourceFiles.each { File sourceFile ->
             ExecAction subAction = getExecActionFactory().newExecAction()
             subAction.commandLine = this.commandLine
             subAction.environment = this.environment
@@ -36,5 +36,9 @@ class CoverityTranslateTask extends AbstractCoverityIntermediatesTask {
             subAction.args sourceFile.path
             subAction.execute()
         }
+    }
+
+    public List<File> getSourceFiles() {
+        compileTask.source.files
     }
 }
