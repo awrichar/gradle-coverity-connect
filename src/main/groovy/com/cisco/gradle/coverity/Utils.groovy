@@ -1,4 +1,4 @@
-package co.arichardson.gradle.coverity
+package com.cisco.gradle.coverity
 
 import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
 

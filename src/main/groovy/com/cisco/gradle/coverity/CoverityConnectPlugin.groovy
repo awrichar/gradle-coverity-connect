@@ -1,10 +1,10 @@
-package co.arichardson.gradle.coverity
+package com.cisco.gradle.coverity
 
-import co.arichardson.gradle.coverity.tasks.CoverityAuthTask
-import co.arichardson.gradle.coverity.tasks.CoverityConfigureTask
-import co.arichardson.gradle.coverity.tasks.CoverityEmitJavaTask
-import co.arichardson.gradle.coverity.tasks.CoverityRunTask
-import co.arichardson.gradle.coverity.tasks.CoverityTranslateTask
+import com.cisco.gradle.coverity.tasks.CoverityAuthTask
+import com.cisco.gradle.coverity.tasks.CoverityConfigureTask
+import com.cisco.gradle.coverity.tasks.CoverityEmitJavaTask
+import com.cisco.gradle.coverity.tasks.CoverityRunTask
+import com.cisco.gradle.coverity.tasks.CoverityTranslateTask
 import org.gradle.api.Task
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.JarBinarySpec

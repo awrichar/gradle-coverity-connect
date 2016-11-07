@@ -1,6 +1,6 @@
-package co.arichardson.gradle.coverity.tasks
+package com.cisco.gradle.coverity.tasks
 
-import co.arichardson.gradle.coverity.Utils
+import com.cisco.gradle.coverity.Utils
 import org.gradle.language.nativeplatform.tasks.AbstractNativeCompileTask
 import org.gradle.process.internal.ExecAction
 

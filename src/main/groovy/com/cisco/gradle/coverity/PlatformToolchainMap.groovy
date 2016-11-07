@@ -1,4 +1,4 @@
-package co.arichardson.gradle.coverity
+package com.cisco.gradle.coverity
 
 import org.gradle.nativeplatform.platform.NativePlatform
 import org.gradle.nativeplatform.toolchain.NativeToolChain

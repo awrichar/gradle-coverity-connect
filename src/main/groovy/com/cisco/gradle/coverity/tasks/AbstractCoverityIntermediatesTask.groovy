@@ -1,6 +1,6 @@
-package co.arichardson.gradle.coverity.tasks
+package com.cisco.gradle.coverity.tasks
 
-import co.arichardson.gradle.coverity.CoverityStream
+import com.cisco.gradle.coverity.CoverityStream
 
 abstract class AbstractCoverityIntermediatesTask extends AbstractCoverityTask {
     public static final String INTERMEDIATES_DIR = 'coverity-intermediates'

@@ -1,6 +1,6 @@
-package co.arichardson.gradle.coverity.tasks
+package com.cisco.gradle.coverity.tasks
 
-import co.arichardson.gradle.coverity.Utils
+import com.cisco.gradle.coverity.Utils
 
 class CoverityConfigureTask extends AbstractCoverityTask {
     String compiler

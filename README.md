@@ -3,8 +3,8 @@ A Gradle plugin for running Coverity static analysis on Java and native code.
 
 Example usage:
 
-    apply plugin: 'co.arichardson.coverity'
-    import co.arichardson.gradle.coverity.CoverityStream
+    apply plugin: 'com.cisco.coverity'
+    import com.cisco.gradle.coverity.CoverityStream
 
     model {
         coverity {

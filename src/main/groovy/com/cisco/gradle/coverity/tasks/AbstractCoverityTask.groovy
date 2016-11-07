@@ -1,6 +1,6 @@
-package co.arichardson.gradle.coverity.tasks
+package com.cisco.gradle.coverity.tasks
 
-import co.arichardson.gradle.coverity.CoveritySpec
+import com.cisco.gradle.coverity.CoveritySpec
 import org.gradle.api.tasks.Exec
 
 abstract class AbstractCoverityTask extends Exec {
