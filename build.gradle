@@ -3,7 +3,7 @@ apply plugin: 'maven-publish'
 
 def publishName = 'coverity-connect'
 group = 'com.cisco.gradle'
-version = '1.9'
+version = '1.10'
 
 dependencies {
     compile localGroovy()
