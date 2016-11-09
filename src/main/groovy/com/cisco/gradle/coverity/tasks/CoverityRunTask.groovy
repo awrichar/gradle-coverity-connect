@@ -6,8 +6,6 @@ import org.gradle.api.GradleException
 import java.util.regex.Pattern
 
 class CoverityRunTask extends AbstractCoverityIntermediatesTask {
-    private static final int COVERITY_AUTH_KEY_NOT_FOUND = 4
-
     final List<File> sourceFiles
 
     public CoverityRunTask() {
@@ -15,7 +13,6 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
         sourceFiles = new ArrayList<File>()
 
         executable Utils.findCoverityTool('cov-run-desktop', coverity.path)
-        args '--auth-key-file', coverity.authKeyFile
         addHostConfig()
         args(*coverity.args)
     }
@@ -38,6 +35,21 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
                 '--stream', stream.stream,
                 '--text-output', resultsFile.path
         ]
+
+        if (!(coverity.authKeyFile || (coverity.authUser && coverity.authPassword))) {
+            throw new IllegalArgumentException('Either authKeyFile or authUser/authPassword must be specified.')
+        }
+
+        if (coverity.authKeyFile) {
+            extraArgs << '--auth-key-file' << coverity.authKeyFile.path
+        }
+
+        if (coverity.authUser && coverity.authPassword) {
+            extraArgs << '--user' << coverity.authUser << '--password' << coverity.authPassword
+            if (coverity.authKeyFile) {
+                extraArgs << '--create-auth-key'
+            }
+        }
 
         if (coverity.scm) {
             extraArgs << '--scm' << coverity.scm
@@ -62,15 +74,7 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
 
     @Override
     protected void exec() {
-        ignoreExitValue = true
         super.exec()
-
-        if (execResult.exitValue == COVERITY_AUTH_KEY_NOT_FOUND) {
-            throw new GradleException("Authentication key was not found - please run 'gradle coverity-auth --no-daemon' to generate.")
-        }
-
-        execResult.assertNormalExitValue()
-
         logger.lifecycle("Static analysis complete. Results saved to ${resultsFile}")
     }
 

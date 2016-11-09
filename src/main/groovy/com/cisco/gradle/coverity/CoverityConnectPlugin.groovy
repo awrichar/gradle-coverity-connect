@@ -1,6 +1,6 @@
 package com.cisco.gradle.coverity
 
-import com.cisco.gradle.coverity.tasks.CoverityAuthTask
+
 import com.cisco.gradle.coverity.tasks.CoverityConfigureTask
 import com.cisco.gradle.coverity.tasks.CoverityEmitJavaTask
 import com.cisco.gradle.coverity.tasks.CoverityRunTask
@@ -31,7 +31,6 @@ import org.gradle.platform.base.BinarySpec
 
 class CoverityConnectPlugin extends RuleSource {
     public static final String COVERITY_TASK_GROUP = "Coverity static analysis tasks"
-    public static final String COVERITY_KEY_FILE = '.coverity_key'
     private static final PlatformToolchainMap platformToolchains = [:]
 
     /**
@@ -51,7 +50,6 @@ class CoverityConnectPlugin extends RuleSource {
 
         coverity.enabled = true
         coverity.port = '8080'
-        coverity.authKeyFile = new File(System.getProperty('user.home'), COVERITY_KEY_FILE)
         coverity.streams.beforeEach {
             it.enabled = true
             it.filter = { true }
@@ -73,17 +71,6 @@ class CoverityConnectPlugin extends RuleSource {
                 platformToolchains.setCppCompiler(platformToolChain.platform, toolChain,
                         platformToolChain.cppCompiler.executable)
             }
-        }
-    }
-
-    /**
-     * Create the coverity-auth task
-     */
-    @Mutate
-    void createCoverityAuthTask(ModelMap<Task> tasks) {
-        tasks.create('coverity-auth', CoverityAuthTask) { task ->
-            task.group = COVERITY_TASK_GROUP
-            task.description = 'Generates a Coverity authentication key file.'
         }
     }
 

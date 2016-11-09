@@ -20,6 +20,12 @@ interface CoveritySpec {
     File getAuthKeyFile()
     void setAuthKeyFile(File key)
 
+    String getAuthUser()
+    void setAuthUser(String user)
+
+    String getAuthPassword()
+    void setAuthPassword(String password)
+
     String getScm()
     void setScm(String scm)
 
