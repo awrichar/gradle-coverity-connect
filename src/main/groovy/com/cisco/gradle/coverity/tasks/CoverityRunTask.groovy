@@ -67,6 +67,10 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
             args += sourceFiles
         }
 
+        if (!coverity.ignoreFailures) {
+            extraArgs << '--exit1-if-defects' << 'true'
+        }
+
         resultsFile.parentFile.mkdirs()
 
         args = extraArgs + args

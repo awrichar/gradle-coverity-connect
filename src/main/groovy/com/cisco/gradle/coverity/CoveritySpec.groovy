@@ -35,6 +35,9 @@ interface CoveritySpec {
     File getIntermediatesDir()
     void setIntermediatesDir(File dir)
 
+    boolean getIgnoreFailures()
+    void setIgnoreFailures(boolean ignore)
+
     List<String> getArgs()
 
     ModelMap<CoverityStream> getStreams()
