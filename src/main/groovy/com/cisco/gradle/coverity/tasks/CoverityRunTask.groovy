@@ -1,14 +1,14 @@
 package com.cisco.gradle.coverity.tasks
 
 import com.cisco.gradle.coverity.Utils
-import org.gradle.api.GradleException
+import groovy.json.JsonSlurper
 
 import java.util.regex.Pattern
 
 class CoverityRunTask extends AbstractCoverityIntermediatesTask {
     final List<File> sourceFiles
 
-    public CoverityRunTask() {
+    CoverityRunTask() {
         super()
         sourceFiles = new ArrayList<File>()
 
@@ -24,6 +24,28 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
             standardOutput = output
         }
         return output.toString().trim()
+    }
+
+    private List<String> findScmModifiedFiles() {
+        List<String> modifiedFiles = null
+
+        File.createTempFile("cov", ".tmp").with { File tmp ->
+            project.exec {
+                executable Utils.findCoverityTool('cov-extract-scm', coverity.path)
+                args '--get-modified-files', '--scm', coverity.scm, '--output', tmp.path
+            }
+
+            Map scmDetails = new JsonSlurper().parse(tmp) as Map
+            modifiedFiles = scmDetails['modified_files'] as List
+
+            tmp.deleteOnExit()
+        }
+
+        return modifiedFiles
+    }
+
+    private Collection<String> normalizePaths(Collection<Object> paths) {
+        return paths.collect { project.file(it).canonicalPath }
     }
 
     @Override
@@ -62,7 +84,10 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
         if (coverity.analyzeScmModified) {
             extraArgs << '--analyze-scm-modified'
             extraArgs << '--restrict-modified-file-regex'
-            extraArgs << sourceFiles.collect{ Pattern.quote(it.path) }.join('|')
+
+            Collection<String> modifiedSources = normalizePaths(sourceFiles)
+                    .intersect(normalizePaths(findScmModifiedFiles()))
+            extraArgs << modifiedSources.collect{ Pattern.quote(it) }.join('|')
         } else {
             args += sourceFiles
         }
