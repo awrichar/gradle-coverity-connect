@@ -34,9 +34,11 @@ The following properties can be set on the `coverity` block:
 * **host:** hostname for the Coverity Connect server (required)
 * **port:** port for the Coverity Connect server (default: 8080)
 * **path:** path to Coverity tools folder (default: looks in COVERITY_HOME or in PATH)
-* **authKeyFile:** path to the authentication key for Coverity Connect (default: ~/.coverity_key)
+* **authKeyFile:** path to the authentication key for Coverity Connect
+* **authUser:** username to authenticate with Coverity Connect
+* **authPassword:** password to authenticate with Coverity Connect
 * **enabled:** whether to run Coverity for this project (default: true)
 * **scm:** type of SCM in use (git, svn, etc)
 * **analyzeScmModified:** if true, analyze only files modified according to the SCM
 * **intermediatesDir:** base directory to store Coverity intermediates
-
+* **ignoreFailures:** don't fail the build for static analysis issues (default: false)
