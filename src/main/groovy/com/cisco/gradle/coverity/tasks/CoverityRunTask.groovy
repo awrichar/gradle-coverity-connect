@@ -17,26 +17,34 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
         args(*coverity.args)
     }
 
-    private String findGitRoot() {
-        ByteArrayOutputStream output = new ByteArrayOutputStream()
-        project.exec {
-            commandLine 'git', 'rev-parse', '--show-toplevel'
-            standardOutput = output
+    private String findScmRoot() {
+        if (coverity.scm == 'git') {
+            ByteArrayOutputStream output = new ByteArrayOutputStream()
+            project.exec {
+                commandLine 'git', 'rev-parse', '--show-toplevel'
+                standardOutput = output
+            }
+            return output.toString().trim()
         }
-        return output.toString().trim()
+
+        return '.'
     }
 
     private List<String> findScmModifiedFiles() {
         List<String> modifiedFiles = null
+        String scmRoot = findScmRoot()
 
         File.createTempFile("cov", ".tmp").with { File tmp ->
             project.exec {
                 executable Utils.findCoverityTool('cov-extract-scm', coverity.path)
-                args '--get-modified-files', '--scm', coverity.scm, '--output', tmp.path
+                args '--get-modified-files'
+                args '--scm', coverity.scm, '--project-root', scmRoot, '--output', tmp.path
             }
 
             Map scmDetails = new JsonSlurper().parse(tmp) as Map
-            modifiedFiles = scmDetails['modified_files'] as List
+            modifiedFiles = (scmDetails['modified_files'] as List).collect { String filename ->
+                [scmRoot, filename].join(File.separator)
+            }
 
             tmp.deleteOnExit()
         }
@@ -75,10 +83,7 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
 
         if (coverity.scm) {
             extraArgs << '--scm' << coverity.scm
-
-            if (coverity.scm == 'git') {
-                extraArgs << '--scm-project-root' << findGitRoot()
-            }
+            extraArgs << '--scm-project-root' << findScmRoot()
         }
 
         if (coverity.analyzeScmModified) {
@@ -87,7 +92,12 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
 
             Collection<String> modifiedSources = normalizePaths(sourceFiles)
                     .intersect(normalizePaths(findScmModifiedFiles()))
-            extraArgs << modifiedSources.collect{ Pattern.quote(it) }.join('|')
+
+            if (modifiedSources) {
+                extraArgs << modifiedSources.collect { Pattern.quote(it) }.join('|')
+            } else {
+                extraArgs << '""'
+            }
         } else {
             args += sourceFiles
         }
