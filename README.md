@@ -42,3 +42,9 @@ The following properties can be set on the `coverity` block:
 * **analyzeScmModified:** if true, analyze only files modified according to the SCM
 * **intermediatesDir:** base directory to store Coverity intermediates
 * **ignoreFailures:** don't fail the build for static analysis issues (default: false)
+
+## License
+
+Author: Andrew Richardson (andreric@cisco.com)
+
+Created for Cisco and released under the terms of the Apache 2.0 License (contribution #143904610).
