@@ -39,6 +39,7 @@ interface CoveritySpec {
     void setIgnoreFailures(boolean ignore)
 
     List<String> getArgs()
+    void setArgs(List<String> args)
 
     ModelMap<CoverityStream> getStreams()
 }
