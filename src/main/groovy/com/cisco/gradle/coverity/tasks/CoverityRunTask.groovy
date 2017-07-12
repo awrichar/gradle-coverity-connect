@@ -14,7 +14,9 @@ class CoverityRunTask extends AbstractCoverityIntermediatesTask {
 
         executable Utils.findCoverityTool('cov-run-desktop', coverity.path)
         addHostConfig()
-        args(*coverity.args)
+        if (coverity.args) {
+            args(*coverity.args)
+        }
     }
 
     private String findScmRoot() {
