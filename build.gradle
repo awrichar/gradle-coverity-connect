@@ -6,6 +6,7 @@ version = '1.15'
 
 ext {
     publishName = 'coverity-connect'
+    publishHomepage = 'https://github.com/awrichar/gradle-coverity-connect'
 }
 
 targetCompatibility = '1.6'
